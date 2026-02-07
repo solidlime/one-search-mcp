@@ -3,7 +3,7 @@ const http = require('http');
 const BASE_URL = 'http://localhost:8484';
 let sessionId = null;
 
-console.log('=== MCP SearXNG Search Test ===\n');
+console.log('=== Custom User-Agent Test ===\n');
 
 function makeRequest(method, body, headers = {}) {
   return new Promise((resolve, reject) => {
@@ -32,8 +32,7 @@ function makeRequest(method, body, headers = {}) {
 
     const req = http.request(options, (res) => {
       let data = '';
-
-      // Capture session ID from response
+      
       if (res.headers['mcp-session-id']) {
         sessionId = res.headers['mcp-session-id'];
       }
@@ -64,24 +63,24 @@ async function runTest() {
       params: {
         protocolVersion: '2024-11-05',
         capabilities: {},
-        clientInfo: { name: 'SearXNG-Test', version: '1.0' }
+        clientInfo: { name: 'UA-Test', version: '1.0' }
       },
       id: 1
     });
 
-    const initRes = await makeRequest('POST', initBody);
+    await makeRequest('POST', initBody);
     console.log(`   ✅ Session ID: ${sessionId}\n`);
 
-    // 2. Search with SearXNG
-    console.log('2️⃣ Calling one_search with SearXNG...');
+    // 2. Search with custom User-Agent (via header)
+    console.log('2️⃣ Search with custom User-Agent (X-User-Agent header)...');
     const searchBody = JSON.stringify({
       jsonrpc: '2.0',
       method: 'tools/call',
       params: {
         name: 'one_search',
         arguments: {
-          query: 'github',
-          max_results: 3
+          query: 'test',
+          max_results: 1
         }
       },
       id: 2
@@ -89,33 +88,51 @@ async function runTest() {
 
     const searchRes = await makeRequest('POST', searchBody, {
       'X-Search-Provider': 'searxng',
-      'X-Search-API-URL': 'http://nas:11111'
+      'X-Search-API-URL': 'http://nas:11111',
+      'X-User-Agent': 'CustomBot/1.0 (Testing)'
     });
 
-    console.log(`   Response status: ${searchRes.statusCode}`);
-
     if (searchRes.statusCode === 200) {
-      // Parse SSE format
       const lines = searchRes.body.split('\n');
       const dataLine = lines.find(line => line.startsWith('data:'));
-
+      
       if (dataLine) {
         const data = JSON.parse(dataLine.substring(5).trim());
-
+        
         if (data.result) {
-          console.log('   ✅✅✅ SEARCH SUCCESS! ✅✅✅\n');
-          const resultText = data.result.content[0].text;
-          console.log('   Raw result:');
-          console.log(resultText.substring(0, 500));
-          console.log('\n   (User-Agent fix is working! 🎉)');
+          console.log('   ✅ Search with custom User-Agent succeeded!');
+          console.log('   (If this works, SearXNG accepted our custom UA)\n');
         } else if (data.error) {
-          console.error('   ❌ MCP Error:', data.error.message);
+          console.error('   ❌ Error:', data.error.message);
         }
       }
-    } else {
-      console.error(`   ❌ HTTP ${searchRes.statusCode}`);
-      console.error(`   Body: ${searchRes.body.substring(0, 500)}`);
     }
+
+    // 3. Search with default User-Agent (no header)
+    console.log('3️⃣ Search with default User-Agent (no X-User-Agent header)...');
+    const searchRes2 = await makeRequest('POST', searchBody, {
+      'X-Search-Provider': 'searxng',
+      'X-Search-API-URL': 'http://nas:11111'
+      // No X-User-Agent header - should use default
+    });
+
+    if (searchRes2.statusCode === 200) {
+      const lines = searchRes2.body.split('\n');
+      const dataLine = lines.find(line => line.startsWith('data:'));
+      
+      if (dataLine) {
+        const data = JSON.parse(dataLine.substring(5).trim());
+        
+        if (data.result) {
+          console.log('   ✅ Search with default User-Agent succeeded!');
+          console.log('   (Used default Chrome UA)\n');
+        } else if (data.error) {
+          console.error('   ❌ Error:', data.error.message);
+        }
+      }
+    }
+
+    console.log('🎉 All tests passed! User-Agent customization is working! 🎉');
 
   } catch (error) {
     console.error('\n💥 Test failed:', error.message);

@@ -20,6 +20,7 @@ export interface ISearchRequestOptions {
   timeout?: number | string;
   apiKey?: string;
   apiUrl?: string;
+  userAgent?: string;
   retry?: AsyncRetry.Options;
 }
 

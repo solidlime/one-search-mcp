@@ -27,7 +27,7 @@ async function testSearXNG() {
   console.log(`1️⃣ Requesting: ${fullUrl}\n`);
 
   const parsedUrl = new URL(fullUrl);
-  
+
   return new Promise((resolve, reject) => {
     const timeout = setTimeout(() => {
       req.destroy();
@@ -47,7 +47,7 @@ async function testSearXNG() {
       }
     }, (res) => {
       clearTimeout(timeout);
-      
+
       console.log(`✅ Response status: ${res.statusCode}`);
       console.log(`✅ Response headers:`, res.headers);
       console.log('');
@@ -59,14 +59,14 @@ async function testSearXNG() {
           const json = JSON.parse(data);
           console.log(`✅ Valid JSON response`);
           console.log(`✅ Results count: ${json.results?.length || 0}`);
-          
+
           if (json.results && json.results.length > 0) {
             console.log('\n📋 First result:');
             console.log(`   Title: ${json.results[0].title}`);
             console.log(`   URL: ${json.results[0].url}`);
             console.log(`   Content: ${json.results[0].content?.substring(0, 100)}...`);
           }
-          
+
           resolve({ success: true, results: json.results });
         } catch (err) {
           console.error(`❌ JSON parse error: ${err.message}`);

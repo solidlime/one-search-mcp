@@ -35,6 +35,7 @@ const FORMAT = process.env.FORMAT ?? 'json';
 const LANGUAGE = process.env.LANGUAGE ?? 'auto';
 const TIME_RANGE = process.env.TIME_RANGE ?? '';
 const DEFAULT_TIMEOUT = process.env.TIMEOUT ?? 10000;
+const USER_AGENT = process.env.SEARCH_USER_AGENT ?? 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 
 const searchDefaultConfig = {
   limit: Number(LIMIT),
@@ -45,6 +46,7 @@ const searchDefaultConfig = {
   engines: ENGINES,
   time_range: TIME_RANGE,
   timeout: DEFAULT_TIMEOUT,
+  userAgent: USER_AGENT,
 };
 
 // Factory function to create a new MCP server instance
@@ -533,17 +535,20 @@ async function runServer(): Promise<void> {
         const headerProvider = req.headers['x-search-provider'] as string | undefined;
         const headerApiUrl = req.headers['x-search-api-url'] as string | undefined;
         const headerApiKey = req.headers['x-search-api-key'] as string | undefined;
+        const headerUserAgent = req.headers['x-user-agent'] as string | undefined;
 
         // Save original environment variables
         const originalProvider = process.env.SEARCH_PROVIDER;
         const originalApiUrl = process.env.SEARCH_API_URL;
         const originalApiKey = process.env.SEARCH_API_KEY;
+        const originalUserAgent = process.env.SEARCH_USER_AGENT;
 
         try {
           // Temporarily override environment variables with header values
           if (headerProvider) process.env.SEARCH_PROVIDER = headerProvider;
           if (headerApiUrl) process.env.SEARCH_API_URL = headerApiUrl;
           if (headerApiKey) process.env.SEARCH_API_KEY = headerApiKey;
+          if (headerUserAgent) process.env.SEARCH_USER_AGENT = headerUserAgent;
 
           let transport: WebStandardStreamableHTTPServerTransport;
           let webRequest: Request;
@@ -665,6 +670,7 @@ async function runServer(): Promise<void> {
           process.env.SEARCH_PROVIDER = originalProvider;
           process.env.SEARCH_API_URL = originalApiUrl;
           process.env.SEARCH_API_KEY = originalApiKey;
+          process.env.SEARCH_USER_AGENT = originalUserAgent;
         }
       });
 

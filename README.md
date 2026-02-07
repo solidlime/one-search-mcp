@@ -367,6 +367,7 @@ Since streamable-http mode cannot use environment variables from LibreChat's `en
 - `X-Search-Provider`: Search provider (`searxng`, `duckduckgo`, `bing`, `tavily`, `google`, `zhipu`, `exa`, `bocha`, `local`)
 - `X-Search-API-URL`: API URL for the search provider (required for `searxng` and `google`)
 - `X-Search-API-Key`: API key (required for `tavily`, `bing`, `google`, `zhipu`, `exa`, `bocha`)
+- `X-User-Agent`: Custom User-Agent string for search requests (optional, overrides default)
 
 **Example with Tavily API:**
 
@@ -418,6 +419,7 @@ Once configured, you'll have access to these tools:
 - **SEARCH_PROVIDER** (Optional): The search provider to use, supports `searxng`, `duckduckgo`, `bing`, `tavily`, `google`, `zhipu`, `exa`, `bocha`, `local`, default is `local`.
 - **SEARCH_API_URL** (Optional): The URL of the SearxNG API, or Google Custom Search Engine ID for `google`.
 - **SEARCH_API_KEY** (Optional): The API key for the search provider, required for `tavily`, `bing`, `google`, `zhipu`, `exa`, `bocha`.
+- **SEARCH_USER_AGENT** (Optional): Custom User-Agent string for search requests. Default: `Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36`
 
 ```ts
 // supported search providers

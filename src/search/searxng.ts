@@ -20,6 +20,7 @@ export async function searxngSearch(params: ISearchRequestOptions): Promise<ISea
     timeout = 10000,
     apiKey,
     apiUrl,
+    userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
   } = params;
 
   if (!query?.trim()) {
@@ -51,7 +52,7 @@ export async function searxngSearch(params: ISearchRequestOptions): Promise<ISea
 
     const headers: HeadersInit = {
       'Content-Type': 'application/json',
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'User-Agent': userAgent,
       'Accept': 'application/json',
       'Accept-Language': 'en-US,en;q=0.9',
     };

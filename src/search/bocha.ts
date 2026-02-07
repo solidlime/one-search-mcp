@@ -40,7 +40,7 @@ interface BochaSearchResponse {
 }
 
 export async function bochaSearch(options: ISearchRequestOptions): Promise<ISearchResponse> {
-  const { query, apiKey, limit = 10, timeRange } = options;
+  const { query, apiKey, limit = 10, timeRange, userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36' } = options;
 
   if (!query?.trim()) {
     throw new Error('Query cannot be empty');
@@ -69,7 +69,7 @@ export async function bochaSearch(options: ISearchRequestOptions): Promise<ISear
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'User-Agent': userAgent,
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({

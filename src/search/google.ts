@@ -28,7 +28,7 @@ interface GoogleSearchResponse {
 }
 
 export async function googleSearch(options: ISearchRequestOptions): Promise<ISearchResponse> {
-  const { query, apiKey, apiUrl, limit = 10, language } = options;
+  const { query, apiKey, apiUrl, limit = 10, language, userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36' } = options;
 
   if (!query?.trim()) {
     throw new Error('Query cannot be empty');
@@ -56,7 +56,7 @@ export async function googleSearch(options: ISearchRequestOptions): Promise<ISea
     const response = await fetch(`${GOOGLE_SEARCH_ENDPOINT}?${params}`, {
       method: 'GET',
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'User-Agent': userAgent,
         'Accept': 'application/json',
       },
       signal: controller.signal,
