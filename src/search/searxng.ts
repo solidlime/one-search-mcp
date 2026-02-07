@@ -98,7 +98,13 @@ export async function searxngSearch(params: ISearchRequestOptions): Promise<ISea
   } catch (err: unknown) {
     clearTimeout(timeoutId);
     const msg = err instanceof Error ? err.message : 'Searxng search error.';
-    searchLogger.error(msg);
+    searchLogger.error({
+      error: msg,
+      apiUrl,
+      query,
+      errorType: err instanceof Error ? err.name : 'Unknown',
+      cause: err instanceof Error && 'cause' in err ? err.cause : undefined,
+    }, 'SearXNG API request failed');
     throw err;
   }
 }

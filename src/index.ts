@@ -466,12 +466,12 @@ async function runServer(): Promise<void> {
             headers.set(key, Array.isArray(value) ? value[0] : value as string);
           }
         }
-        
+
         const init: RequestInit = {
           method: req.method,
           headers,
         };
-        
+
         if (body !== undefined) {
           const bodyString = JSON.stringify(body);
           init.body = bodyString;
@@ -479,14 +479,14 @@ async function runServer(): Promise<void> {
           headers.set('content-type', 'application/json');
           headers.set('content-length', Buffer.byteLength(bodyString, 'utf8').toString());
         }
-        
+
         return new Request(url, init);
       };
 
       // Helper to send Web Standard Response to Node.js response
       const sendWebResponse = async (webRes: Response, res: any) => {
         res.writeHead(webRes.status, Object.fromEntries(webRes.headers.entries()));
-        
+
         if (webRes.body) {
           const reader = webRes.body.getReader();
           try {
@@ -499,7 +499,7 @@ async function runServer(): Promise<void> {
             reader.releaseLock();
           }
         }
-        
+
         res.end();
       };
 
@@ -522,6 +522,13 @@ async function runServer(): Promise<void> {
         const sessionIdRaw = req.headers['mcp-session-id'];
         const sessionId = Array.isArray(sessionIdRaw) ? sessionIdRaw[0] : sessionIdRaw as string | undefined;
 
+        // Debug logging
+        process.stderr.write(`\n[${new Date().toISOString()}] ${req.method} ${req.url}\n`);
+        process.stderr.write(`  Session ID: ${sessionId || 'none'}\n`);
+        process.stderr.write(`  Accept: ${req.headers['accept']}\n`);
+        process.stderr.write(`  Content-Type: ${req.headers['content-type'] || 'none'}\n`);
+        process.stderr.write(`  Active sessions: ${Object.keys(transports).join(', ') || 'none'}\n`);
+
         // Read custom headers for search configuration (streamable-http mode)
         const headerProvider = req.headers['x-search-provider'] as string | undefined;
         const headerApiUrl = req.headers['x-search-api-url'] as string | undefined;
@@ -542,9 +549,10 @@ async function runServer(): Promise<void> {
           let webRequest: Request;
 
           if (sessionId && transports[sessionId]) {
+            process.stderr.write(`  → Reusing existing session\n`);
             // Reuse existing transport for established sessions
             transport = transports[sessionId];
-            
+
             // For GET requests, don't parse body
             if (req.method === 'GET') {
               webRequest = toWebRequest(req);
@@ -556,7 +564,7 @@ async function runServer(): Promise<void> {
           } else if (!sessionId && req.method === 'POST') {
             // Parse request body to check if it's an initialize request
             const parsedBody = await parseBody(req);
-            
+
             if (!parsedBody) {
               res.writeHead(400, { 'Content-Type': 'application/json' });
               res.end(JSON.stringify({
@@ -568,6 +576,7 @@ async function runServer(): Promise<void> {
             }
 
             if (isInitializeRequest(parsedBody)) {
+              process.stderr.write(`  → Initialize request detected\n`);
               // Create new transport and server for initialization requests
               const mcpServer = createMcpServer();
 
@@ -591,21 +600,23 @@ async function runServer(): Promise<void> {
               };
 
               await mcpServer.connect(transport);
-              
+
               // Create Web Standard Request with parsed body
               webRequest = toWebRequest(req, parsedBody);
               const webResponse = await transport.handleRequest(webRequest);
-              
+
               // Get session ID from response headers and register BEFORE sending response
               const responseSessionId = webResponse.headers.get('mcp-session-id');
-              
+
               if (responseSessionId) {
                 transports[responseSessionId] = transport;
                 servers[responseSessionId] = mcpServer;
+                process.stderr.write(`  → Session registered: ${responseSessionId}\n`);
               }
-              
+
               // Send response AFTER registration
               await sendWebResponse(webResponse, res);
+              process.stderr.write(`  ✓ Initialize response sent\n`);
               return;
             } else {
               // Not an initialize request and no session ID
@@ -619,6 +630,7 @@ async function runServer(): Promise<void> {
             }
           } else {
             // Invalid request
+            process.stderr.write(`  ✗ Invalid request: method=${req.method}, sessionId=${sessionId}\n`);
             res.writeHead(400, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({
               jsonrpc: '2.0',
@@ -628,8 +640,26 @@ async function runServer(): Promise<void> {
             return;
           }
 
+          process.stderr.write(`  → Handling request via transport\n`);
           const webResponse = await transport.handleRequest(webRequest);
+          process.stderr.write(`  ← Response status: ${webResponse.status}\n`);
           await sendWebResponse(webResponse, res);
+          process.stderr.write(`  ✓ Response sent\n`);
+        } catch (error) {
+          process.stderr.write(`  ✗ ERROR: ${error instanceof Error ? error.message : String(error)}\n`);
+          if (error instanceof Error && error.stack) {
+            process.stderr.write(`  Stack: ${error.stack}\n`);
+          }
+
+          // Send error response if headers not yet sent
+          if (!res.headersSent) {
+            res.writeHead(500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({
+              jsonrpc: '2.0',
+              error: { code: -32603, message: 'Internal server error' },
+              id: null,
+            }));
+          }
         } finally {
           // Restore original environment variables after request
           process.env.SEARCH_PROVIDER = originalProvider;
@@ -658,7 +688,7 @@ async function runServer(): Promise<void> {
       // Default: Run in stdio mode
       // Create a single server instance for stdio
       const server = createMcpServer();
-      
+
       // Do NOT write to stdout before connecting - it will break MCP protocol
       const transport = new StdioServerTransport();
       await server.connect(transport);

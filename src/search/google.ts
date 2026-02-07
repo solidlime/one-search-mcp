@@ -84,7 +84,11 @@ export async function googleSearch(options: ISearchRequestOptions): Promise<ISea
   } catch (error) {
     clearTimeout(timeoutId);
     const msg = error instanceof Error ? error.message : 'Google search error.';
-    searchLogger.error(msg);
+    searchLogger.error({
+      error: msg,
+      query,
+      errorType: error instanceof Error ? error.name : 'Unknown',
+    }, 'Google Search API request failed');
     throw error;
   }
 }

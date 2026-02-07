@@ -50,7 +50,12 @@ export async function exaSearch(options: ISearchRequestOptions): Promise<ISearch
   } catch (err: unknown) {
     clearTimeout(timeoutId);
     const msg = err instanceof Error ? err.message : 'Exa search error.';
-    searchLogger.error(msg);
+    searchLogger.error({
+      error: msg,
+      apiKey: apiKey ? '***' : undefined,
+      query,
+      errorType: err instanceof Error ? err.name : 'Unknown',
+    }, 'Exa Search API request failed');
     throw err;
   }
 }

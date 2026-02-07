@@ -95,7 +95,12 @@ export async function zhipuSearch(options: ISearchRequestOptions): Promise<ISear
   } catch (err: unknown) {
     clearTimeout(timeoutId);
     const msg = err instanceof Error ? err.message : 'Zhipu search error.';
-    searchLogger.error(msg);
+    searchLogger.error({
+      error: msg,
+      apiKey: apiKey ? '***' : undefined,
+      query,
+      errorType: err instanceof Error ? err.name : 'Unknown',
+    }, 'Zhipu Search API request failed');
     throw err;
   }
 }

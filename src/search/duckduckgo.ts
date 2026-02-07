@@ -49,7 +49,11 @@ export async function duckDuckGoSearch(options: Omit<ISearchRequestOptions, 'saf
     };
   } catch (error) {
     const msg = error instanceof Error ? error.message : 'DuckDuckGo search error.';
-    searchLogger.error(msg);
+    searchLogger.error({
+      error: msg,
+      query,
+      errorType: error instanceof Error ? error.name : 'Unknown',
+    }, 'DuckDuckGo Search API request failed');
     throw error;
   }
 }

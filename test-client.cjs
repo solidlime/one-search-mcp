@@ -30,7 +30,7 @@ async function test() {
   // Search
   console.log('2 ️⃣ Search...');
   await new Promise(resolve => setTimeout(resolve, 1000));
-  
+
   const searchBody = JSON.stringify({
     jsonrpc: '2.0',
     method: 'tools/call',

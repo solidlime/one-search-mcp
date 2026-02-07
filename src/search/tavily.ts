@@ -61,7 +61,12 @@ export async function tavilySearch(options: ISearchRequestOptions): Promise<ISea
   } catch (error) {
     clearTimeout(timeoutId);
     const msg = error instanceof Error ? error.message : 'Tavily search error.';
-    searchLogger.error(msg);
+    searchLogger.error({
+      error: msg,
+      apiKey: apiKey ? '***' : undefined,
+      query,
+      errorType: error instanceof Error ? error.name : 'Unknown',
+    }, 'Tavily Search API request failed');
     throw error;
   }
 }

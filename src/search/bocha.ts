@@ -103,7 +103,12 @@ export async function bochaSearch(options: ISearchRequestOptions): Promise<ISear
   } catch (err: unknown) {
     clearTimeout(timeoutId);
     const msg = err instanceof Error ? err.message : 'Bocha search error.';
-    searchLogger.error(msg);
+    searchLogger.error({
+      error: msg,
+      apiKey: apiKey ? '***' : undefined,
+      query,
+      errorType: err instanceof Error ? err.name : 'Unknown',
+    }, 'Bocha Search API request failed');
     throw err;
   }
 }

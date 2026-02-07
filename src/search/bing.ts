@@ -279,7 +279,12 @@ export async function bingSearch(options: ISearchRequestOptions): Promise<ISearc
   } catch (err: unknown) {
     clearTimeout(timeoutId);
     const msg = err instanceof Error ? err.message : 'Bing search error.';
-    searchLogger.error(msg);
+    searchLogger.error({
+      error: msg,
+      apiKey: apiKey ? '***' : undefined,
+      query,
+      errorType: err instanceof Error ? err.name : 'Unknown',
+    }, 'Bing Search API request failed');
     throw err;
   }
 }
