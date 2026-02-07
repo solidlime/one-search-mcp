@@ -384,6 +384,58 @@ Once configured, you'll have access to these tools:
 export type SearchProvider = 'searxng' | 'duckduckgo' | 'bing' | 'tavily' | 'google' | 'zhipu' | 'exa' | 'bocha' | 'local';
 ```
 
+### Environment Variable Priority
+
+The server uses [dotenvx](https://dotenvx.com/) for environment variable management with the following priority order:
+
+**Priority Order (highest to lowest):**
+1. **Client-side environment variables** (Docker `-e`, `docker-compose`, LibreChat config)
+2. **`.env` file** in the project root
+3. **Default values** in code (`SEARCH_PROVIDER=local`)
+
+This means client-side configurations always override `.env` file settings, allowing flexible deployment without modifying the `.env` file.
+
+**Client-Side Configuration Examples:**
+
+```bash
+# Docker CLI with environment variables
+docker run -p 8000:8000 \
+  -e SEARCH_PROVIDER=searxng \
+  -e SEARCH_API_URL=http://your-searxng:8080 \
+  ghcr.io/solidlime/one-search-mcp:latest
+
+# docker-compose with environment variables
+services:
+  one-search-mcp:
+    image: ghcr.io/solidlime/one-search-mcp:latest
+    ports:
+      - "8000:8000"
+    environment:
+      - SEARCH_PROVIDER=tavily
+      - SEARCH_API_KEY=your-api-key-here
+
+# LibreChat MCP configuration
+{
+  "mcpServers": {
+    "one-search": {
+      "url": "http://one-search-mcp:8000",
+      "env": {
+        "SEARCH_PROVIDER": "bing",
+        "SEARCH_API_KEY": "your-bing-api-key"
+      }
+    }
+  }
+}
+
+# Direct environment variable (Linux/macOS)
+export SEARCH_PROVIDER=duckduckgo
+npm start
+
+# PowerShell (Windows)
+$env:SEARCH_PROVIDER="duckduckgo"
+npm start
+```
+
 ### Search Provider Configuration
 
 | Provider | API Key Required | API URL Required | Notes |
