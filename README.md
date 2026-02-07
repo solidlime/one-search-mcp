@@ -10,6 +10,51 @@ A Model Context Protocol (MCP) server implementation that integrates with multip
   - Use `agent-browser` for browser automation.
   - Free, no API keys required.
 - **Enabled tools:** `one_search`, `one_scrape`, `one_map`, `one_extract`
+- **Multiple Transports:** Supports both stdio (default) and Streamable HTTP transports
+
+## Transport Modes
+
+OneSearch MCP Server supports two transport modes:
+
+### stdio (Default)
+
+The standard stdin/stdout transport, used by most MCP clients like Claude Desktop:
+
+```bash
+# Run with stdio transport (default)
+npx -y one-search-mcp
+```
+
+### Streamable HTTP
+
+HTTP-based transport for remote access and web integration:
+
+```bash
+# Run with Streamable HTTP transport on port 8000 (default)
+npx -y one-search-mcp streamable-http
+
+# Or specify custom port
+npx -y one-search-mcp streamable-http --port=8080
+```
+
+**Client Configuration:**
+
+```json
+{
+  "mcpServers": {
+    "one-search-mcp": {
+      "url": "http://localhost:8000"
+    }
+  }
+}
+```
+
+**Features:**
+- ✅ Remote access over HTTP
+- ✅ Session management with unique session IDs
+- ✅ Server-Sent Events (SSE) for real-time updates
+- ✅ Compatible with MCP Streamable HTTP specification
+- ✅ Easy to deploy behind reverse proxies
 
 ## Migration from v1.1.0 and Earlier
 
@@ -97,6 +142,8 @@ docker pull ghcr.io/yokingma/one-search-mcp:latest
 docker pull zacma/one-search-mcp:latest
 ```
 
+#### Docker with stdio (Claude Desktop)
+
 **Configure with Claude Desktop:**
 
 ```json
@@ -104,7 +151,7 @@ docker pull zacma/one-search-mcp:latest
   "mcpServers": {
     "one-search-mcp": {
       "command": "docker",
-      "args": ["run", "-i", "--rm", "ghcr.io/yokingma/one-search-mcp:latest"],
+      "args": ["run", "-i", "--rm", "ghcr.io/yokingma/one-search-mcp:latest", "node", "dist/index.js"],
       "env": {
         "SEARCH_PROVIDER": "local"
       }
@@ -124,8 +171,65 @@ docker pull zacma/one-search-mcp:latest
         "run", "-i", "--rm",
         "-e", "SEARCH_PROVIDER=tavily",
         "-e", "SEARCH_API_KEY=your_api_key",
-        "ghcr.io/yokingma/one-search-mcp:latest"
+        "ghcr.io/yokingma/one-search-mcp:latest",
+        "node", "dist/index.js"
       ]
+    }
+  }
+}
+```
+
+#### Docker with Streamable HTTP (LibreChat / Remote Access)
+
+**Run with Docker:**
+
+```bash
+# Run on default port 8000
+docker run -d -p 8000:8000 ghcr.io/yokingma/one-search-mcp:latest
+
+# Or with custom port and search provider
+docker run -d \
+  -p 8080:8080 \
+  -e SEARCH_PROVIDER=searxng \
+  -e SEARCH_API_URL=http://your-searxng:8080 \
+  ghcr.io/yokingma/one-search-mcp:latest \
+  node dist/index.js streamable-http --port=8080
+```
+
+**Using Docker Compose:**
+
+```bash
+# Start the service
+docker-compose up -d
+
+# View logs
+docker-compose logs -f
+
+# Stop the service
+docker-compose down
+```
+
+**Configure with LibreChat:**
+
+Add to your LibreChat MCP configuration:
+
+```json
+{
+  "mcpServers": {
+    "one-search-mcp": {
+      "url": "http://one-search-mcp:8000"
+    }
+  }
+}
+```
+
+Or if running externally:
+
+```json
+{
+  "mcpServers": {
+    "one-search-mcp": {
+      "url": "http://localhost:8000"
     }
   }
 }

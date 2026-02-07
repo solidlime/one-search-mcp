@@ -25,9 +25,14 @@ RUN npm prune --production
 # Default to local search provider (uses agent-browser with Chromium)
 ENV SEARCH_PROVIDER=local
 ENV NODE_ENV=production
+ENV PORT=8000
+
+# Expose port for Streamable HTTP transport
+EXPOSE 8000
 
 # Run as non-root user for security
 USER pwuser
 
-# Command to run the MCP server
-CMD ["node", "dist/index.js"]
+# Command to run the MCP server in Streamable HTTP mode
+# To run with stdio instead, override CMD: docker run <image> node dist/index.js
+CMD ["node", "dist/index.js", "streamable-http", "--port=8000"]

@@ -2,6 +2,9 @@
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
+import { createServer } from 'node:http';
+import { randomUUID } from 'node:crypto';
 import { ISearchRequestOptions, ISearchResponse, SearchProvider } from './interface.js';
 import { bingSearch, duckDuckGoSearch, searxngSearch, tavilySearch, localSearch, googleSearch, zhipuSearch, exaSearch, bochaSearch } from './search/index.js';
 import { SEARCH_TOOL, EXTRACT_TOOL, SCRAPE_TOOL, MAP_TOOL } from './tools.js';
@@ -417,17 +420,60 @@ async function processExtract(args: ExtractInput): Promise<{
   }
 }
 
-async function runServer(): Promise<void> {
-  try {
-    // Do NOT write to stdout before connecting - it will break MCP protocol
-    const transport = new StdioServerTransport();
-    await server.connect(transport);
+// Parse command line arguments
+function parseArgs() {
+  const args = process.argv.slice(2);
+  const mode = args[0];
+  const portArg = args.find(arg => arg.startsWith('--port='));
+  const port = portArg ? parseInt(portArg.split('=')[1], 10) : 8000;
 
-    // Now we can send logging messages through MCP protocol
-    await server.sendLoggingMessage({
-      level: 'info',
-      data: 'OneSearch MCP server started',
-    });
+  return { mode, port };
+}
+
+async function runServer(): Promise<void> {
+  const { mode, port } = parseArgs();
+
+  try {
+    if (mode === 'streamable-http' || mode === 'http') {
+      // Run in Streamable HTTP mode
+      const transport = new StreamableHTTPServerTransport({
+        sessionIdGenerator: () => randomUUID(),
+      });
+
+      await server.connect(transport);
+
+      const httpServer = createServer(async (req, res) => {
+        await transport.handleRequest(req, res);
+      });
+
+      httpServer.listen(port, () => {
+        process.stderr.write(`OneSearch MCP server (Streamable HTTP) listening on http://0.0.0.0:${port}\n`);
+        process.stderr.write(`Endpoint: http://0.0.0.0:${port}/mcp\n`);
+      });
+
+      // Handle shutdown gracefully
+      const shutdown = () => {
+        process.stderr.write('\nShutting down...\n');
+        httpServer.close(() => {
+          process.exit(0);
+        });
+      };
+
+      process.on('SIGINT', shutdown);
+      process.on('SIGTERM', shutdown);
+
+    } else {
+      // Default: Run in stdio mode
+      // Do NOT write to stdout before connecting - it will break MCP protocol
+      const transport = new StdioServerTransport();
+      await server.connect(transport);
+
+      // Now we can send logging messages through MCP protocol
+      await server.sendLoggingMessage({
+        level: 'info',
+        data: 'OneSearch MCP server (stdio) started',
+      });
+    }
 
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
