@@ -3,6 +3,8 @@ name: Publish Docker images
 on:
   workflow_dispatch: {}
   push:
+    branches:
+      - main
     tags:
       - "v*.*.*"
 
@@ -48,10 +50,6 @@ jobs:
             type=semver,pattern={{major}}.{{minor}}
             type=semver,pattern={{major}}
             type=raw,value=latest,enable={{is_default_branch}}
-
-      - name: Login to GitHub Container Registry
-        run: |
-          echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
       - name: Build and push
         uses: docker/build-push-action@v6
