@@ -209,9 +209,103 @@ docker-compose logs -f
 docker-compose down
 ```
 
-**Configure with LibreChat:**
+## Deployment for LibreChat
 
-Add to your LibreChat MCP configuration:
+### Pull Pre-built Docker Image
+
+Images are automatically built and published via GitHub Actions when new versions are tagged:
+
+```bash
+# Pull from GitHub Container Registry (recommended)
+docker pull ghcr.io/solidlime/one-search-mcp:latest
+
+# Or pull from Docker Hub
+docker pull zacma/one-search-mcp:latest
+
+# Pull specific version
+docker pull ghcr.io/solidlime/one-search-mcp:v1.2.0
+```
+
+### Using with LibreChat
+
+**Option 1: Docker Compose (Recommended)**
+
+Create a `docker-compose.yml` for LibreChat integration:
+
+```yaml
+version: '3.8'
+
+services:
+  one-search-mcp:
+    image: ghcr.io/solidlime/one-search-mcp:latest
+    container_name: one-search-mcp
+    ports:
+      - "8000:8000"
+    environment:
+      # Use SearXNG for search
+      - SEARCH_PROVIDER=searxng
+      - SEARCH_API_URL=http://your-searxng-host:11111
+      # Or use other providers
+      # - SEARCH_PROVIDER=tavily
+      # - SEARCH_API_KEY=your_api_key
+      - NODE_ENV=production
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - librechat_network
+
+  # If you want to run SearXNG alongside
+  # searxng:
+  #   image: searxng/searxng:latest
+  #   container_name: searxng
+  #   ports:
+  #     - "11111:8080"
+  #   networks:
+  #     - librechat_network
+
+networks:
+  librechat_network:
+    external: true  # Use existing LibreChat network
+```
+
+**Option 2: Standalone Container**
+
+```bash
+# Run with default settings (local search)
+docker run -d \
+  --name one-search-mcp \
+  -p 8000:8000 \
+  --restart unless-stopped \
+  ghcr.io/solidlime/one-search-mcp:latest
+
+# Run with SearXNG
+docker run -d \
+  --name one-search-mcp \
+  -p 8000:8000 \
+  -e SEARCH_PROVIDER=searxng \
+  -e SEARCH_API_URL=http://nas:11111 \
+  --restart unless-stopped \
+  ghcr.io/solidlime/one-search-mcp:latest
+
+# Run with Tavily API
+docker run -d \
+  --name one-search-mcp \
+  -p 8000:8000 \
+  -e SEARCH_PROVIDER=tavily \
+  -e SEARCH_API_KEY=your_api_key \
+  --restart unless-stopped \
+  ghcr.io/solidlime/one-search-mcp:latest
+```
+
+### LibreChat MCP Configuration
+
+Add to your LibreChat configuration file (`librechat.yaml` or MCP settings):
+
+**If running in the same Docker network:**
 
 ```json
 {
@@ -223,17 +317,59 @@ Add to your LibreChat MCP configuration:
 }
 ```
 
-Or if running externally:
+**If running on a different host:**
 
 ```json
 {
   "mcpServers": {
     "one-search-mcp": {
-      "url": "http://localhost:8000"
+      "url": "http://your-server-ip:8000"
     }
   }
 }
 ```
+
+**With authentication (if configured):**
+
+```json
+{
+  "mcpServers": {
+    "one-search-mcp": {
+      "url": "http://one-search-mcp:8000",
+      "headers": {
+        "Authorization": "Bearer your_token"
+      }
+    }
+  }
+}
+```
+
+### Available Tools in LibreChat
+
+Once configured, you'll have access to these tools:
+
+- **one_search**: Web search with multiple providers
+- **one_scrape**: Extract content from URLs
+- **one_map**: Get all links from a webpage
+- **one_extract**: Extract structured data from multiple URLs
+
+### Troubleshooting
+
+**Connection Failed:**
+- Verify the container is running: `docker ps | grep one-search-mcp`
+- Check logs: `docker logs one-search-mcp`
+- Ensure network connectivity: `docker network inspect librechat_network`
+
+**No Search Results:**
+- Check search provider configuration
+- Verify API keys (for Tavily, Bing, etc.)
+- For SearXNG: ensure it's accessible from the container
+
+**Performance Issues:**
+- Increase timeout in search provider settings
+- For local search: ensure sufficient resources allocated to Docker
+
+
 
 ## Environment Variables
 
