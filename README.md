@@ -11,6 +11,7 @@ A Model Context Protocol (MCP) server implementation that integrates with multip
   - Free, no API keys required.
 - **Enabled tools:** `one_search`, `one_scrape`, `one_map`, `one_extract`
 - **Multiple Transports:** Supports both stdio (default) and Streamable HTTP transports
+- **Session Management:** Full support for multiple concurrent sessions in Streamable HTTP mode (LibreChat compatible)
 
 ## Transport Modes
 
