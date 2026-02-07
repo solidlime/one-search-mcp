@@ -16,10 +16,15 @@ import { SafeSearchType } from 'duck-duck-scrape';
 // Load environment variables silently (suppress all output)
 dotenvx.config({ quiet: true });
 
-// search api
-const SEARCH_API_URL = process.env.SEARCH_API_URL;
-const SEARCH_API_KEY = process.env.SEARCH_API_KEY;
-const SEARCH_PROVIDER: SearchProvider = process.env.SEARCH_PROVIDER as SearchProvider ?? 'local';
+// Helper function to get current search configuration
+// This allows dynamic configuration from HTTP headers in streamable-http mode
+function getSearchConfig() {
+  return {
+    provider: (process.env.SEARCH_PROVIDER as SearchProvider) ?? 'local',
+    apiUrl: process.env.SEARCH_API_URL,
+    apiKey: process.env.SEARCH_API_KEY,
+  };
+}
 
 // search query params
 const SAFE_SEARCH = process.env.SAFE_SEARCH ?? 0;
@@ -105,10 +110,11 @@ server.registerTool(
     inputSchema: SEARCH_TOOL.schema,
   },
   createToolHandler(SEARCH_TOOL.name, async (args: SearchInput) => {
+    const config = getSearchConfig();
     const { results, success } = await processSearch({
       ...args,
-      apiKey: SEARCH_API_KEY ?? '',
-      apiUrl: SEARCH_API_URL,
+      apiKey: config.apiKey ?? '',
+      apiUrl: config.apiUrl,
     });
 
     if (!success) {
@@ -181,13 +187,14 @@ server.registerTool(
 
 // Business logic functions
 async function processSearch(args: ISearchRequestOptions): Promise<ISearchResponse> {
-  switch (SEARCH_PROVIDER) {
+  const config = getSearchConfig();
+  switch (config.provider) {
     case 'searxng': {
       // merge default config with args
       const params = {
         ...searchDefaultConfig,
         ...args,
-        apiKey: SEARCH_API_KEY,
+        apiKey: config.apiKey,
       };
 
       // but categories and language have higher priority (ENV > args).
@@ -205,14 +212,14 @@ async function processSearch(args: ISearchRequestOptions): Promise<ISearchRespon
       return await tavilySearch({
         ...searchDefaultConfig,
         ...args,
-        apiKey: SEARCH_API_KEY,
+        apiKey: config.apiKey,
       });
     }
     case 'bing': {
       return await bingSearch({
         ...searchDefaultConfig,
         ...args,
-        apiKey: SEARCH_API_KEY,
+        apiKey: config.apiKey,
       });
     }
     case 'duckduckgo': {
@@ -221,7 +228,7 @@ async function processSearch(args: ISearchRequestOptions): Promise<ISearchRespon
       return await duckDuckGoSearch({
         ...searchDefaultConfig,
         ...args,
-        apiKey: SEARCH_API_KEY,
+        apiKey: config.apiKey,
         safeSearch: safeSearchOptions[safeSearch],
       });
     }
@@ -235,33 +242,33 @@ async function processSearch(args: ISearchRequestOptions): Promise<ISearchRespon
       return await googleSearch({
         ...searchDefaultConfig,
         ...args,
-        apiKey: SEARCH_API_KEY,
-        apiUrl: SEARCH_API_URL,
+        apiKey: config.apiKey,
+        apiUrl: config.apiUrl,
       });
     }
     case 'zhipu': {
       return await zhipuSearch({
         ...searchDefaultConfig,
         ...args,
-        apiKey: SEARCH_API_KEY,
+        apiKey: config.apiKey,
       });
     }
     case 'exa': {
       return await exaSearch({
         ...searchDefaultConfig,
         ...args,
-        apiKey: SEARCH_API_KEY,
+        apiKey: config.apiKey,
       });
     }
     case 'bocha': {
       return await bochaSearch({
         ...searchDefaultConfig,
         ...args,
-        apiKey: SEARCH_API_KEY,
+        apiKey: config.apiKey,
       });
     }
     default:
-      throw new Error(`Unsupported search provider: ${SEARCH_PROVIDER}`);
+      throw new Error(`Unsupported search provider: ${config.provider}`);
   }
 }
 
@@ -443,7 +450,30 @@ async function runServer(): Promise<void> {
       await server.connect(transport);
 
       const httpServer = createServer(async (req, res) => {
-        await transport.handleRequest(req, res);
+        // Read custom headers for search configuration (streamable-http mode)
+        // These headers allow clients (e.g., LibreChat) to override search settings per request
+        const headerProvider = req.headers['x-search-provider'] as string | undefined;
+        const headerApiUrl = req.headers['x-search-api-url'] as string | undefined;
+        const headerApiKey = req.headers['x-search-api-key'] as string | undefined;
+
+        // Save original environment variables
+        const originalProvider = process.env.SEARCH_PROVIDER;
+        const originalApiUrl = process.env.SEARCH_API_URL;
+        const originalApiKey = process.env.SEARCH_API_KEY;
+
+        try {
+          // Temporarily override environment variables with header values
+          if (headerProvider) process.env.SEARCH_PROVIDER = headerProvider;
+          if (headerApiUrl) process.env.SEARCH_API_URL = headerApiUrl;
+          if (headerApiKey) process.env.SEARCH_API_KEY = headerApiKey;
+
+          await transport.handleRequest(req, res);
+        } finally {
+          // Restore original environment variables after request
+          process.env.SEARCH_PROVIDER = originalProvider;
+          process.env.SEARCH_API_URL = originalApiUrl;
+          process.env.SEARCH_API_KEY = originalApiKey;
+        }
       });
 
       httpServer.listen(port, () => {

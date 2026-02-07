@@ -344,6 +344,45 @@ Add to your LibreChat configuration file (`librechat.yaml` or MCP settings):
 }
 ```
 
+**With custom search configuration (streamable-http mode):**
+
+Since streamable-http mode cannot use environment variables from LibreChat's `env` field, use custom headers instead:
+
+```json
+{
+  "mcpServers": {
+    "one-search-mcp": {
+      "url": "http://one-search-mcp:8000",
+      "headers": {
+        "X-Search-Provider": "searxng",
+        "X-Search-API-URL": "http://your-searxng:8080"
+      }
+    }
+  }
+}
+```
+
+**Available custom headers:**
+- `X-Search-Provider`: Search provider (`searxng`, `duckduckgo`, `bing`, `tavily`, `google`, `zhipu`, `exa`, `bocha`, `local`)
+- `X-Search-API-URL`: API URL for the search provider (required for `searxng` and `google`)
+- `X-Search-API-Key`: API key (required for `tavily`, `bing`, `google`, `zhipu`, `exa`, `bocha`)
+
+**Example with Tavily API:**
+
+```json
+{
+  "mcpServers": {
+    "one-search-mcp": {
+      "url": "http://one-search-mcp:8000",
+      "headers": {
+        "X-Search-Provider": "tavily",
+        "X-Search-API-Key": "tvly-xxxxxxxxxxxxx"
+      }
+    }
+  }
+}
+```
+
 ### Available Tools in LibreChat
 
 Once configured, you'll have access to these tools:
@@ -389,11 +428,12 @@ export type SearchProvider = 'searxng' | 'duckduckgo' | 'bing' | 'tavily' | 'goo
 The server uses [dotenvx](https://dotenvx.com/) for environment variable management with the following priority order:
 
 **Priority Order (highest to lowest):**
-1. **Client-side environment variables** (Docker `-e`, `docker-compose`, LibreChat config)
-2. **`.env` file** in the project root
-3. **Default values** in code (`SEARCH_PROVIDER=local`)
+1. **HTTP Custom Headers** (streamable-http mode only: `X-Search-Provider`, `X-Search-API-URL`, `X-Search-API-Key`)
+2. **Client-side environment variables** (Docker `-e`, `docker-compose`)
+3. **`.env` file** in the project root
+4. **Default values** in code (`SEARCH_PROVIDER=local`)
 
-This means client-side configurations always override `.env` file settings, allowing flexible deployment without modifying the `.env` file.
+This means HTTP headers (in streamable-http mode) take precedence over all other configuration methods, allowing LibreChat and other HTTP clients to dynamically configure the search provider per request without modifying environment variables or the `.env` file.
 
 **Client-Side Configuration Examples:**
 
