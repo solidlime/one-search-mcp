@@ -2,8 +2,8 @@
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
-import { createServer } from 'node:http';
+import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
+import { createServer as createHttpServer } from 'node:http';
 import { randomUUID } from 'node:crypto';
 import { ISearchRequestOptions, ISearchResponse, SearchProvider } from './interface.js';
 import { bingSearch, duckDuckGoSearch, searxngSearch, tavilySearch, localSearch, googleSearch, zhipuSearch, exaSearch, bochaSearch } from './search/index.js';
@@ -36,20 +36,6 @@ const LANGUAGE = process.env.LANGUAGE ?? 'auto';
 const TIME_RANGE = process.env.TIME_RANGE ?? '';
 const DEFAULT_TIMEOUT = process.env.TIMEOUT ?? 10000;
 
-// Server implementation using MCP SDK v1.25+ pattern
-const server = new McpServer(
-  {
-    name: 'one-search-mcp',
-    version: '1.2.0',
-  },
-  {
-    capabilities: {
-      tools: {},
-      logging: {},
-    },
-  },
-);
-
 const searchDefaultConfig = {
   limit: Number(LIMIT),
   categories: CATEGORIES,
@@ -61,28 +47,44 @@ const searchDefaultConfig = {
   timeout: DEFAULT_TIMEOUT,
 };
 
-// Helper function to wrap tool handlers with logging and error handling
-function createToolHandler<TInput, TOutput>(
-  toolName: string,
-  handler: (args: TInput) => Promise<TOutput>,
-) {
-  return async (args: TInput) => {
-    const startTime = Date.now();
+// Factory function to create a new MCP server instance
+// This is called for each session in streamable-http mode
+function createMcpServer(): McpServer {
+  const server = new McpServer(
+    {
+      name: 'one-search-mcp',
+      version: '1.2.0',
+    },
+    {
+      capabilities: {
+        tools: {},
+        logging: {},
+      },
+    },
+  );
 
-    try {
-      await server.sendLoggingMessage({
-        level: 'info',
-        data: `[${new Date().toISOString()}] Request started for tool: [${toolName}]`,
-      });
+  // Helper function to wrap tool handlers with logging and error handling
+  function createToolHandler<TInput, TOutput>(
+    toolName: string,
+    handler: (args: TInput) => Promise<TOutput>,
+  ) {
+    return async (args: TInput) => {
+      const startTime = Date.now();
 
-      const result = await handler(args);
+      try {
+        await server.sendLoggingMessage({
+          level: 'info',
+          data: `[${new Date().toISOString()}] Request started for tool: [${toolName}]`,
+        });
 
-      await server.sendLoggingMessage({
-        level: 'info',
-        data: `[${new Date().toISOString()}] Request completed in ${Date.now() - startTime}ms`,
-      });
+        const result = await handler(args);
 
-      return result;
+        await server.sendLoggingMessage({
+          level: 'info',
+          data: `[${new Date().toISOString()}] Request completed in ${Date.now() - startTime}ms`,
+        });
+
+        return result;
     } catch (error) {
       await server.sendLoggingMessage({
         level: 'error',
@@ -184,6 +186,9 @@ server.registerTool(
     };
   }),
 );
+
+  return server;
+}
 
 // Business logic functions
 async function processSearch(args: ISearchRequestOptions): Promise<ISearchResponse> {
@@ -437,21 +442,87 @@ function parseArgs() {
   return { mode, port };
 }
 
+// Helper to check if request is initialize
+const isInitializeRequest = (body: unknown): boolean => {
+  return typeof body === 'object' && body !== null && 'method' in body && (body as { method: string }).method === 'initialize';
+};
+
 async function runServer(): Promise<void> {
   const { mode, port } = parseArgs();
 
   try {
     if (mode === 'streamable-http' || mode === 'http') {
-      // Run in Streamable HTTP mode
-      const transport = new StreamableHTTPServerTransport({
-        sessionIdGenerator: () => randomUUID(),
-      });
+      // Run in Streamable HTTP mode with session management
+      // Store transports and servers by session ID
+      const transports: { [sessionId: string]: WebStandardStreamableHTTPServerTransport } = {};
+      const servers: { [sessionId: string]: McpServer } = {};
 
-      await server.connect(transport);
+      // Helper to convert Node.js request to Web Standard Request
+      const toWebRequest = (req: any, body?: unknown): Request => {
+        const url = `http://${req.headers.host || 'localhost'}${req.url || '/'}`;
+        const headers = new Headers();
+        for (const [key, value] of Object.entries(req.headers)) {
+          if (value) {
+            headers.set(key, Array.isArray(value) ? value[0] : value as string);
+          }
+        }
+        
+        const init: RequestInit = {
+          method: req.method,
+          headers,
+        };
+        
+        if (body !== undefined) {
+          const bodyString = JSON.stringify(body);
+          init.body = bodyString;
+          // Update Content-Length and Content-Type for reconstructed body
+          headers.set('content-type', 'application/json');
+          headers.set('content-length', Buffer.byteLength(bodyString, 'utf8').toString());
+        }
+        
+        return new Request(url, init);
+      };
 
-      const httpServer = createServer(async (req, res) => {
+      // Helper to send Web Standard Response to Node.js response
+      const sendWebResponse = async (webRes: Response, res: any) => {
+        res.writeHead(webRes.status, Object.fromEntries(webRes.headers.entries()));
+        
+        if (webRes.body) {
+          const reader = webRes.body.getReader();
+          try {
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              res.write(value);
+            }
+          } finally {
+            reader.releaseLock();
+          }
+        }
+        
+        res.end();
+      };
+
+      // Parse JSON body
+      const parseBody = async (req: any): Promise<unknown> => {
+        const chunks: Buffer[] = [];
+        for await (const chunk of req) {
+          chunks.push(chunk as Buffer);
+        }
+        const body = Buffer.concat(chunks).toString();
+        try {
+          return JSON.parse(body);
+        } catch {
+          return null;
+        }
+      };
+
+      const httpServer = createHttpServer(async (req, res) => {
+        // Get session ID from header (handle both string and array)
+        const sessionIdRaw = req.headers['mcp-session-id'];
+        const sessionId = Array.isArray(sessionIdRaw) ? sessionIdRaw[0] : sessionIdRaw as string | undefined;
+
         // Read custom headers for search configuration (streamable-http mode)
-        // These headers allow clients (e.g., LibreChat) to override search settings per request
         const headerProvider = req.headers['x-search-provider'] as string | undefined;
         const headerApiUrl = req.headers['x-search-api-url'] as string | undefined;
         const headerApiKey = req.headers['x-search-api-key'] as string | undefined;
@@ -467,7 +538,98 @@ async function runServer(): Promise<void> {
           if (headerApiUrl) process.env.SEARCH_API_URL = headerApiUrl;
           if (headerApiKey) process.env.SEARCH_API_KEY = headerApiKey;
 
-          await transport.handleRequest(req, res);
+          let transport: WebStandardStreamableHTTPServerTransport;
+          let webRequest: Request;
+
+          if (sessionId && transports[sessionId]) {
+            // Reuse existing transport for established sessions
+            transport = transports[sessionId];
+            
+            // For GET requests, don't parse body
+            if (req.method === 'GET') {
+              webRequest = toWebRequest(req);
+            } else {
+              // For POST, parse body
+              const parsedBody = await parseBody(req);
+              webRequest = toWebRequest(req, parsedBody);
+            }
+          } else if (!sessionId && req.method === 'POST') {
+            // Parse request body to check if it's an initialize request
+            const parsedBody = await parseBody(req);
+            
+            if (!parsedBody) {
+              res.writeHead(400, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({
+                jsonrpc: '2.0',
+                error: { code: -32700, message: 'Parse error' },
+                id: null,
+              }));
+              return;
+            }
+
+            if (isInitializeRequest(parsedBody)) {
+              // Create new transport and server for initialization requests
+              const mcpServer = createMcpServer();
+
+              transport = new WebStandardStreamableHTTPServerTransport({
+                sessionIdGenerator: () => randomUUID(),
+                onsessioninitialized: (newSessionId: string) => {
+                  transports[newSessionId] = transport;
+                  servers[newSessionId] = mcpServer;
+                },
+              });
+
+              transport.onclose = () => {
+                const sid = transport.sessionId;
+                if (sid && transports[sid]) {
+                  delete transports[sid];
+                  if (servers[sid]) {
+                    servers[sid].close();
+                    delete servers[sid];
+                  }
+                }
+              };
+
+              await mcpServer.connect(transport);
+              
+              // Create Web Standard Request with parsed body
+              webRequest = toWebRequest(req, parsedBody);
+              const webResponse = await transport.handleRequest(webRequest);
+              
+              // Get session ID from response headers and register BEFORE sending response
+              const responseSessionId = webResponse.headers.get('mcp-session-id');
+              
+              if (responseSessionId) {
+                transports[responseSessionId] = transport;
+                servers[responseSessionId] = mcpServer;
+              }
+              
+              // Send response AFTER registration
+              await sendWebResponse(webResponse, res);
+              return;
+            } else {
+              // Not an initialize request and no session ID
+              res.writeHead(400, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({
+                jsonrpc: '2.0',
+                error: { code: -32000, message: 'Bad Request: No valid session ID' },
+                id: null,
+              }));
+              return;
+            }
+          } else {
+            // Invalid request
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({
+              jsonrpc: '2.0',
+              error: { code: -32000, message: 'Bad Request: Invalid request' },
+              id: null,
+            }));
+            return;
+          }
+
+          const webResponse = await transport.handleRequest(webRequest);
+          await sendWebResponse(webResponse, res);
         } finally {
           // Restore original environment variables after request
           process.env.SEARCH_PROVIDER = originalProvider;
@@ -494,6 +656,9 @@ async function runServer(): Promise<void> {
 
     } else {
       // Default: Run in stdio mode
+      // Create a single server instance for stdio
+      const server = createMcpServer();
+      
       // Do NOT write to stdout before connecting - it will break MCP protocol
       const transport = new StdioServerTransport();
       await server.connect(transport);
