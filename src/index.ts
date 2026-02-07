@@ -678,25 +678,25 @@ async function runServer(): Promise<void> {
           } else {
             delete process.env.SEARCH_PROVIDER;
           }
-          
+
           if (originalApiUrl !== undefined) {
             process.env.SEARCH_API_URL = originalApiUrl;
           } else {
             delete process.env.SEARCH_API_URL;
           }
-          
+
           if (originalApiKey !== undefined) {
             process.env.SEARCH_API_KEY = originalApiKey;
           } else {
             delete process.env.SEARCH_API_KEY;
           }
-          
+
           if (originalUserAgent !== undefined) {
             process.env.SEARCH_USER_AGENT = originalUserAgent;
           } else {
             delete process.env.SEARCH_USER_AGENT;
           }
-          
+
           if (originalTimeout !== undefined) {
             process.env.TIMEOUT = originalTimeout;
           } else {

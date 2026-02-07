@@ -131,7 +131,7 @@ Override configuration per-request using HTTP headers. **Headers take priority o
 
 The server automatically detects installed browsers:
 - ✅ Google Chrome
-- ✅ Microsoft Edge  
+- ✅ Microsoft Edge
 - ✅ Chromium
 - ✅ Google Chrome Canary
 
@@ -307,7 +307,7 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 ---
 
-**Need Help?** 
+**Need Help?**
 - 📖 [MCP Documentation](https://modelcontextprotocol.io/)
 - 🐛 [Report Issues](https://github.com/yokingma/one-search-mcp/issues)
 - ⭐ [Star on GitHub](https://github.com/yokingma/one-search-mcp)

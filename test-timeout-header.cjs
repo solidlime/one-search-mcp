@@ -91,7 +91,7 @@ async function runTest() {
     });
 
     console.log(`   Response status: ${res1.statusCode}`);
-    
+
     if (res1.statusCode === 200) {
       const lines = res1.body.split('\n');
       const dataLine = lines.find(line => line.startsWith('data:'));
@@ -130,7 +130,7 @@ async function runTest() {
     });
 
     console.log(`   Response status: ${res2.statusCode}`);
-    
+
     if (res2.statusCode === 200) {
       const lines = res2.body.split('\n');
       const dataLine = lines.find(line => line.startsWith('data:'));
