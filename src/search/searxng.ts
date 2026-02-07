@@ -36,7 +36,7 @@ export async function searxngSearch(params: ISearchRequestOptions): Promise<ISea
 
   try {
     const startTime = Date.now();
-    
+
     const config = {
       q: query,
       pageno: page,
@@ -76,7 +76,7 @@ export async function searxngSearch(params: ISearchRequestOptions): Promise<ISea
     });
 
     clearTimeout(timeoutId);
-    
+
     const elapsed = Date.now() - startTime;
     searchLogger.info({
       status: res.status,
@@ -92,13 +92,13 @@ export async function searxngSearch(params: ISearchRequestOptions): Promise<ISea
     }
 
     const response = await res.json();
-    
+
     if (response.results) {
       searchLogger.info({
         resultCount: response.results.length,
         elapsed: `${Date.now() - startTime}ms`,
       }, 'SearXNG search completed');
-      
+
       const list = (response.results as Array<Record<string, any>>).slice(0, limit);
       const results: ISearchResponseResult[] = list.map((item: Record<string, any>) => {
         const image = item.img_src ? {
@@ -124,27 +124,27 @@ export async function searxngSearch(params: ISearchRequestOptions): Promise<ISea
         success: true,
       };
     }
-    
+
     // No results or error response from SearXNG
     searchLogger.warn({
       response: JSON.stringify(response).substring(0, 500),
       apiUrl,
       query,
     }, 'SearXNG returned no results');
-    
+
     return {
       results: [],
       success: false,
     };
   } catch (err: unknown) {
     clearTimeout(timeoutId);
-    
+
     let errorType = 'Unknown';
     let errorDetails = '';
-    
+
     if (err instanceof Error) {
       errorType = err.name;
-      
+
       // Detect timeout
       if (err.name === 'AbortError' || err.message.includes('aborted')) {
         errorDetails = `Request timeout after ${timeout}ms. SearXNG server may be slow or overloaded.`;
@@ -163,7 +163,7 @@ export async function searxngSearch(params: ISearchRequestOptions): Promise<ISea
     } else {
       errorDetails = String(err);
     }
-    
+
     searchLogger.error({
       error: errorDetails,
       errorType,
@@ -173,7 +173,7 @@ export async function searxngSearch(params: ISearchRequestOptions): Promise<ISea
       engines,
       cause: err instanceof Error && 'cause' in err ? err.cause : undefined,
     }, 'SearXNG API request failed');
-    
+
     throw new Error(`SearXNG search failed: ${errorDetails}`);
   }
 }

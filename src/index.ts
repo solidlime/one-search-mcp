@@ -34,20 +34,22 @@ const ENGINES = process.env.ENGINES ?? 'all';
 const FORMAT = process.env.FORMAT ?? 'json';
 const LANGUAGE = process.env.LANGUAGE ?? 'auto';
 const TIME_RANGE = process.env.TIME_RANGE ?? '';
-const DEFAULT_TIMEOUT = process.env.TIMEOUT ?? 10000;
 const USER_AGENT = process.env.SEARCH_USER_AGENT ?? 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 
-const searchDefaultConfig = {
-  limit: Number(LIMIT),
-  categories: CATEGORIES,
-  format: FORMAT,
-  safesearch: SAFE_SEARCH,
-  language: LANGUAGE,
-  engines: ENGINES,
-  time_range: TIME_RANGE,
-  timeout: DEFAULT_TIMEOUT,
-  userAgent: USER_AGENT,
-};
+// Helper function to get search configuration with dynamic values
+function getSearchDefaultConfig() {
+  return {
+    limit: Number(process.env.LIMIT ?? LIMIT),
+    categories: process.env.CATEGORIES ?? CATEGORIES,
+    format: process.env.FORMAT ?? FORMAT,
+    safesearch: process.env.SAFE_SEARCH ?? SAFE_SEARCH,
+    language: process.env.LANGUAGE ?? LANGUAGE,
+    engines: process.env.ENGINES ?? ENGINES,
+    time_range: process.env.TIME_RANGE ?? TIME_RANGE,
+    timeout: process.env.TIMEOUT ? Number(process.env.TIMEOUT) : 10000,
+    userAgent: process.env.SEARCH_USER_AGENT ?? USER_AGENT,
+  };
+}
 
 // Factory function to create a new MCP server instance
 // This is called for each session in streamable-http mode
@@ -198,14 +200,15 @@ async function processSearch(args: ISearchRequestOptions): Promise<ISearchRespon
   switch (config.provider) {
     case 'searxng': {
       // merge default config with args
+      const defaultConfig = getSearchDefaultConfig();
       const params = {
-        ...searchDefaultConfig,
+        ...defaultConfig,
         ...args,
         apiKey: config.apiKey,
       };
 
       // but categories and language have higher priority (ENV > args).
-      const { categories, language } = searchDefaultConfig;
+      const { categories, language } = defaultConfig;
 
       if (categories) {
         params.categories = categories;
@@ -217,14 +220,14 @@ async function processSearch(args: ISearchRequestOptions): Promise<ISearchRespon
     }
     case 'tavily': {
       return await tavilySearch({
-        ...searchDefaultConfig,
+        ...getSearchDefaultConfig(),
         ...args,
         apiKey: config.apiKey,
       });
     }
     case 'bing': {
       return await bingSearch({
-        ...searchDefaultConfig,
+        ...getSearchDefaultConfig(),
         ...args,
         apiKey: config.apiKey,
       });
@@ -233,7 +236,7 @@ async function processSearch(args: ISearchRequestOptions): Promise<ISearchRespon
       const safeSearch = args.safeSearch ?? 0;
       const safeSearchOptions = [SafeSearchType.STRICT, SafeSearchType.MODERATE, SafeSearchType.OFF];
       return await duckDuckGoSearch({
-        ...searchDefaultConfig,
+        ...getSearchDefaultConfig(),
         ...args,
         apiKey: config.apiKey,
         safeSearch: safeSearchOptions[safeSearch],
@@ -241,13 +244,13 @@ async function processSearch(args: ISearchRequestOptions): Promise<ISearchRespon
     }
     case 'local': {
       return await localSearch({
-        ...searchDefaultConfig,
+        ...getSearchDefaultConfig(),
         ...args,
       });
     }
     case 'google': {
       return await googleSearch({
-        ...searchDefaultConfig,
+        ...getSearchDefaultConfig(),
         ...args,
         apiKey: config.apiKey,
         apiUrl: config.apiUrl,
@@ -255,21 +258,21 @@ async function processSearch(args: ISearchRequestOptions): Promise<ISearchRespon
     }
     case 'zhipu': {
       return await zhipuSearch({
-        ...searchDefaultConfig,
+        ...getSearchDefaultConfig(),
         ...args,
         apiKey: config.apiKey,
       });
     }
     case 'exa': {
       return await exaSearch({
-        ...searchDefaultConfig,
+        ...getSearchDefaultConfig(),
         ...args,
         apiKey: config.apiKey,
       });
     }
     case 'bocha': {
       return await bochaSearch({
-        ...searchDefaultConfig,
+        ...getSearchDefaultConfig(),
         ...args,
         apiKey: config.apiKey,
       });
@@ -536,12 +539,14 @@ async function runServer(): Promise<void> {
         const headerApiUrl = req.headers['x-search-api-url'] as string | undefined;
         const headerApiKey = req.headers['x-search-api-key'] as string | undefined;
         const headerUserAgent = req.headers['x-user-agent'] as string | undefined;
+        const headerTimeout = req.headers['x-search-timeout'] as string | undefined;
 
         // Save original environment variables
         const originalProvider = process.env.SEARCH_PROVIDER;
         const originalApiUrl = process.env.SEARCH_API_URL;
         const originalApiKey = process.env.SEARCH_API_KEY;
         const originalUserAgent = process.env.SEARCH_USER_AGENT;
+        const originalTimeout = process.env.TIMEOUT;
 
         try {
           // Temporarily override environment variables with header values
@@ -549,6 +554,7 @@ async function runServer(): Promise<void> {
           if (headerApiUrl) process.env.SEARCH_API_URL = headerApiUrl;
           if (headerApiKey) process.env.SEARCH_API_KEY = headerApiKey;
           if (headerUserAgent) process.env.SEARCH_USER_AGENT = headerUserAgent;
+          if (headerTimeout) process.env.TIMEOUT = headerTimeout;
 
           let transport: WebStandardStreamableHTTPServerTransport;
           let webRequest: Request;
@@ -667,10 +673,35 @@ async function runServer(): Promise<void> {
           }
         } finally {
           // Restore original environment variables after request
-          process.env.SEARCH_PROVIDER = originalProvider;
-          process.env.SEARCH_API_URL = originalApiUrl;
-          process.env.SEARCH_API_KEY = originalApiKey;
-          process.env.SEARCH_USER_AGENT = originalUserAgent;
+          if (originalProvider !== undefined) {
+            process.env.SEARCH_PROVIDER = originalProvider;
+          } else {
+            delete process.env.SEARCH_PROVIDER;
+          }
+          
+          if (originalApiUrl !== undefined) {
+            process.env.SEARCH_API_URL = originalApiUrl;
+          } else {
+            delete process.env.SEARCH_API_URL;
+          }
+          
+          if (originalApiKey !== undefined) {
+            process.env.SEARCH_API_KEY = originalApiKey;
+          } else {
+            delete process.env.SEARCH_API_KEY;
+          }
+          
+          if (originalUserAgent !== undefined) {
+            process.env.SEARCH_USER_AGENT = originalUserAgent;
+          } else {
+            delete process.env.SEARCH_USER_AGENT;
+          }
+          
+          if (originalTimeout !== undefined) {
+            process.env.TIMEOUT = originalTimeout;
+          } else {
+            delete process.env.TIMEOUT;
+          }
         }
       });
 
