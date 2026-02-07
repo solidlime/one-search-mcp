@@ -35,6 +35,8 @@ export async function searxngSearch(params: ISearchRequestOptions): Promise<ISea
   const timeoutId = setTimeout(() => controller.abort(), Number(timeout));
 
   try {
+    const startTime = Date.now();
+    
     const config = {
       q: query,
       pageno: page,
@@ -61,6 +63,12 @@ export async function searxngSearch(params: ISearchRequestOptions): Promise<ISea
       headers['Authorization'] = `Bearer ${apiKey}`;
     }
 
+    searchLogger.info({
+      endpoint: `${endpoint}${queryParams}`,
+      timeout,
+      engines,
+    }, 'SearXNG request starting');
+
     const res = await fetch(`${endpoint}${queryParams}`, {
       method: 'POST',
       headers,
@@ -68,8 +76,29 @@ export async function searxngSearch(params: ISearchRequestOptions): Promise<ISea
     });
 
     clearTimeout(timeoutId);
+    
+    const elapsed = Date.now() - startTime;
+    searchLogger.info({
+      status: res.status,
+      statusText: res.statusText,
+      elapsed: `${elapsed}ms`,
+      contentType: res.headers.get('content-type'),
+    }, 'SearXNG response received');
+
+    // Check response status
+    if (!res.ok) {
+      const errorText = await res.text().catch(() => 'Unable to read error response');
+      throw new Error(`SearXNG returned ${res.status} ${res.statusText}: ${errorText.substring(0, 200)}`);
+    }
+
     const response = await res.json();
+    
     if (response.results) {
+      searchLogger.info({
+        resultCount: response.results.length,
+        elapsed: `${Date.now() - startTime}ms`,
+      }, 'SearXNG search completed');
+      
       const list = (response.results as Array<Record<string, any>>).slice(0, limit);
       const results: ISearchResponseResult[] = list.map((item: Record<string, any>) => {
         const image = item.img_src ? {
@@ -95,20 +124,56 @@ export async function searxngSearch(params: ISearchRequestOptions): Promise<ISea
         success: true,
       };
     }
+    
+    // No results or error response from SearXNG
+    searchLogger.warn({
+      response: JSON.stringify(response).substring(0, 500),
+      apiUrl,
+      query,
+    }, 'SearXNG returned no results');
+    
     return {
       results: [],
       success: false,
     };
   } catch (err: unknown) {
     clearTimeout(timeoutId);
-    const msg = err instanceof Error ? err.message : 'Searxng search error.';
+    
+    let errorType = 'Unknown';
+    let errorDetails = '';
+    
+    if (err instanceof Error) {
+      errorType = err.name;
+      
+      // Detect timeout
+      if (err.name === 'AbortError' || err.message.includes('aborted')) {
+        errorDetails = `Request timeout after ${timeout}ms. SearXNG server may be slow or overloaded.`;
+      }
+      // Detect network errors
+      else if (err.message.includes('fetch failed') || err.message.includes('ECONNREFUSED') || err.message.includes('ENOTFOUND')) {
+        errorDetails = `Network connection failed. Check if SearXNG server (${apiUrl}) is accessible.`;
+      }
+      // Detect DNS errors
+      else if (err.message.includes('getaddrinfo')) {
+        errorDetails = `DNS resolution failed for ${apiUrl}. Check the hostname.`;
+      }
+      else {
+        errorDetails = err.message;
+      }
+    } else {
+      errorDetails = String(err);
+    }
+    
     searchLogger.error({
-      error: msg,
+      error: errorDetails,
+      errorType,
       apiUrl,
       query,
-      errorType: err instanceof Error ? err.name : 'Unknown',
+      timeout: `${timeout}ms`,
+      engines,
       cause: err instanceof Error && 'cause' in err ? err.cause : undefined,
     }, 'SearXNG API request failed');
-    throw err;
+    
+    throw new Error(`SearXNG search failed: ${errorDetails}`);
   }
 }

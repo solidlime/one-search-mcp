@@ -118,7 +118,8 @@ async function runTest() {
     }
 
   } catch (error) {
-    console.error('\n💥 Test failed:', error.message);
+    console.error('\n💥 Test failed:', error.message || error);
+    console.error('Full error:', error);
     process.exit(1);
   }
 }
