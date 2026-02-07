@@ -32,7 +32,7 @@ function makeRequest(method, body, headers = {}) {
 
     const req = http.request(options, (res) => {
       let data = '';
-      
+
       if (res.headers['mcp-session-id']) {
         sessionId = res.headers['mcp-session-id'];
       }
@@ -95,10 +95,10 @@ async function runTest() {
     if (searchRes.statusCode === 200) {
       const lines = searchRes.body.split('\n');
       const dataLine = lines.find(line => line.startsWith('data:'));
-      
+
       if (dataLine) {
         const data = JSON.parse(dataLine.substring(5).trim());
-        
+
         if (data.result) {
           console.log('   ✅ Search with custom User-Agent succeeded!');
           console.log('   (If this works, SearXNG accepted our custom UA)\n');
@@ -119,10 +119,10 @@ async function runTest() {
     if (searchRes2.statusCode === 200) {
       const lines = searchRes2.body.split('\n');
       const dataLine = lines.find(line => line.startsWith('data:'));
-      
+
       if (dataLine) {
         const data = JSON.parse(dataLine.substring(5).trim());
-        
+
         if (data.result) {
           console.log('   ✅ Search with default User-Agent succeeded!');
           console.log('   (Used default Chrome UA)\n');
