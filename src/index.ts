@@ -486,29 +486,38 @@ async function runServer(): Promise<void> {
       const SESSION_TIMEOUT = 5 * 60 * 1000;
 
       // Start SSE keep-alive for a session
+      // Sends SSE comment (`: keep-alive\n\n`) every 25 seconds to prevent
+      // proxies/load balancers from timing out idle SSE connections (typically 60s).
+      // SDK's _streamMapping: Map<StreamId, { controller, encoder, cleanup }>
       const startKeepAlive = (sessionId: string, transport: WebStandardStreamableHTTPServerTransport) => {
         const timer = setInterval(() => {
           try {
-            // Access private _streamMapping property to send keep-alive comments
-            // This is necessary to prevent timeout issues with long-lived SSE connections
             const transportAny = transport as any;
-            if (transportAny._streamMapping && typeof transportAny._streamMapping.forEach === 'function') {
-              transportAny._streamMapping.forEach((controller: any) => {
+            const streamMapping = transportAny._streamMapping as Map<string, any> | undefined;
+            if (!streamMapping || streamMapping.size === 0) {
+              return; // No active streams, nothing to keep alive
+            }
+
+            const encoder = new TextEncoder();
+            const keepAliveData = encoder.encode(': keep-alive\n\n');
+
+            for (const [streamId, stream] of streamMapping) {
+              if (stream?.controller) {
                 try {
-                  // Send SSE comment format: `: keep-alive\n\n`
-                  controller.enqueue(new TextEncoder().encode(': keep-alive\n\n'));
-                } catch (error) {
-                  // Ignore errors if stream is already closed
+                  stream.controller.enqueue(keepAliveData);
+                  process.stderr.write(`[${new Date().toISOString()}] ♥ Keep-alive sent to stream: ${streamId} (session: ${sessionId})\n`);
+                } catch {
+                  // Stream already closed, ignore
                 }
-              });
+              }
             }
           } catch (error) {
             process.stderr.write(`[${new Date().toISOString()}] Keep-alive error for session ${sessionId}: ${error}\n`);
           }
-        }, 30000); // Send every 30 seconds (half of typical 60s timeout)
+        }, 25000); // 25 seconds (well under typical 60s proxy timeout)
 
         keepAliveTimers.set(sessionId, timer);
-        process.stderr.write(`[${new Date().toISOString()}] Keep-alive timer started for session: ${sessionId}\n`);
+        process.stderr.write(`[${new Date().toISOString()}] Keep-alive timer started for session: ${sessionId} (interval: 25s)\n`);
       };
 
       // Helper to clean up a specific session
