@@ -118,7 +118,7 @@ server.registerTool(
   },
   createToolHandler(SEARCH_TOOL.name, async (args: SearchInput) => {
     const config = getSearchConfig();
-    
+
     // Send progress notification: search started
     await server.sendLoggingMessage({
       level: 'info',
