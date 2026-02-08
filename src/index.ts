@@ -468,20 +468,30 @@ async function runServer(): Promise<void> {
 
       // Helper to clean up a specific session
       const cleanupSession = (sessionId: string) => {
-        if (transports[sessionId]) {
+        // Extract references before deleting from maps to prevent re-entry
+        const transport = transports[sessionId];
+        const server = servers[sessionId];
+        const hasLastActive = !!sessionLastActive[sessionId];
+
+        // Delete from maps first to prevent infinite recursion via onclose
+        if (transport) {
           process.stderr.write(`[${new Date().toISOString()}] Cleaning up session: ${sessionId}\n`);
           delete transports[sessionId];
         }
-        if (servers[sessionId]) {
+        if (server) {
+          delete servers[sessionId];
+        }
+        if (hasLastActive) {
+          delete sessionLastActive[sessionId];
+        }
+
+        // Now safely close the server (this may trigger onclose, but won't loop)
+        if (server) {
           try {
-            servers[sessionId].close();
+            server.close();
           } catch (error) {
             process.stderr.write(`  Warning: Error closing server for session ${sessionId}: ${error}\n`);
           }
-          delete servers[sessionId];
-        }
-        if (sessionLastActive[sessionId]) {
-          delete sessionLastActive[sessionId];
         }
       };
 
