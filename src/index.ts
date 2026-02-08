@@ -593,6 +593,17 @@ async function runServer(): Promise<void> {
       };
 
       const httpServer = createHttpServer(async (req, res) => {
+        // Only accept /mcp endpoint
+        if (req.url !== '/mcp' && req.url !== '/') {
+          res.writeHead(404, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({
+            jsonrpc: '2.0',
+            error: { code: -32000, message: 'Not Found: Use /mcp endpoint' },
+            id: null,
+          }));
+          return;
+        }
+
         // Get session ID from header (handle both string and array)
         const sessionIdRaw = req.headers['mcp-session-id'];
         const sessionId = Array.isArray(sessionIdRaw) ? sessionIdRaw[0] : sessionIdRaw as string | undefined;
