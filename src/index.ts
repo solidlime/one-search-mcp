@@ -485,7 +485,7 @@ async function runServer(): Promise<void> {
       const SESSION_TIMEOUT = 5 * 60 * 1000;
 
       // Helper to clean up a specific session
-      const cleanupSession = (sessionId: string) => {
+      const cleanupSession = async (sessionId: string) => {
         // Extract references before deleting from maps to prevent re-entry
         const transport = transports[sessionId];
         const server = servers[sessionId];
@@ -503,7 +503,16 @@ async function runServer(): Promise<void> {
           delete sessionLastActive[sessionId];
         }
 
-        // Now safely close the server (this may trigger onclose, but won't loop)
+        // Close transport FIRST to cleanup SSE streams and pending responses
+        if (transport) {
+          try {
+            await transport.close();
+          } catch (error) {
+            process.stderr.write(`  Warning: Error closing transport for session ${sessionId}: ${error}\n`);
+          }
+        }
+
+        // Then close the server (this may trigger onclose, but won't loop)
         if (server) {
           try {
             server.close();
@@ -514,7 +523,7 @@ async function runServer(): Promise<void> {
       };
 
       // Periodic cleanup of inactive sessions
-      const cleanupInterval = setInterval(() => {
+      const cleanupInterval = setInterval(async () => {
         const now = Date.now();
         const inactiveSessions: string[] = [];
 
@@ -527,7 +536,7 @@ async function runServer(): Promise<void> {
         if (inactiveSessions.length > 0) {
           process.stderr.write(`[${new Date().toISOString()}] Cleaning up ${inactiveSessions.length} inactive session(s)\n`);
           for (const sessionId of inactiveSessions) {
-            cleanupSession(sessionId);
+            await cleanupSession(sessionId);
           }
         }
       }, 60 * 1000); // Check every minute
@@ -688,7 +697,10 @@ async function runServer(): Promise<void> {
               transport.onclose = () => {
                 const sid = transport.sessionId;
                 if (sid) {
-                  cleanupSession(sid);
+                  // Fire-and-forget cleanup (already removed from maps to prevent infinite recursion)
+                  cleanupSession(sid).catch(err => {
+                    process.stderr.write(`  Warning: Error in onclose cleanup for session ${sid}: ${err}\n`);
+                  });
                 }
               };
 
@@ -820,7 +832,7 @@ async function runServer(): Promise<void> {
       });
 
       // Handle shutdown gracefully
-      const shutdown = () => {
+      const shutdown = async () => {
         process.stderr.write('\nShutting down...\n');
 
         // Clear cleanup interval
@@ -831,7 +843,7 @@ async function runServer(): Promise<void> {
         if (activeSessions.length > 0) {
           process.stderr.write(`Cleaning up ${activeSessions.length} active session(s)...\n`);
           for (const sessionId of activeSessions) {
-            cleanupSession(sessionId);
+            await cleanupSession(sessionId);
           }
         }
 
