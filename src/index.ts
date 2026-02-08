@@ -480,9 +480,36 @@ async function runServer(): Promise<void> {
       const transports: { [sessionId: string]: WebStandardStreamableHTTPServerTransport } = {};
       const servers: { [sessionId: string]: McpServer } = {};
       const sessionLastActive: { [sessionId: string]: number } = {};
+      const keepAliveTimers = new Map<string, NodeJS.Timeout>();
 
       // Session timeout in milliseconds (5 minutes)
       const SESSION_TIMEOUT = 5 * 60 * 1000;
+
+      // Start SSE keep-alive for a session
+      const startKeepAlive = (sessionId: string, transport: WebStandardStreamableHTTPServerTransport) => {
+        const timer = setInterval(() => {
+          try {
+            // Access private _streamMapping property to send keep-alive comments
+            // This is necessary to prevent timeout issues with long-lived SSE connections
+            const transportAny = transport as any;
+            if (transportAny._streamMapping && typeof transportAny._streamMapping.forEach === 'function') {
+              transportAny._streamMapping.forEach((controller: any) => {
+                try {
+                  // Send SSE comment format: `: keep-alive\n\n`
+                  controller.enqueue(new TextEncoder().encode(': keep-alive\n\n'));
+                } catch (error) {
+                  // Ignore errors if stream is already closed
+                }
+              });
+            }
+          } catch (error) {
+            process.stderr.write(`[${new Date().toISOString()}] Keep-alive error for session ${sessionId}: ${error}\n`);
+          }
+        }, 30000); // Send every 30 seconds (half of typical 60s timeout)
+
+        keepAliveTimers.set(sessionId, timer);
+        process.stderr.write(`[${new Date().toISOString()}] Keep-alive timer started for session: ${sessionId}\n`);
+      };
 
       // Helper to clean up a specific session
       const cleanupSession = async (sessionId: string) => {
@@ -490,6 +517,14 @@ async function runServer(): Promise<void> {
         const transport = transports[sessionId];
         const server = servers[sessionId];
         const hasLastActive = !!sessionLastActive[sessionId];
+
+        // Clear keep-alive timer first
+        const timer = keepAliveTimers.get(sessionId);
+        if (timer) {
+          clearInterval(timer);
+          keepAliveTimers.delete(sessionId);
+          process.stderr.write(`[${new Date().toISOString()}] Keep-alive timer cleared for session: ${sessionId}\n`);
+        }
 
         // Delete from maps first to prevent infinite recursion via onclose
         if (transport) {
@@ -691,6 +726,8 @@ async function runServer(): Promise<void> {
                   transports[newSessionId] = transport;
                   servers[newSessionId] = mcpServer;
                   sessionLastActive[newSessionId] = Date.now();
+                  // Start keep-alive timer for this session
+                  startKeepAlive(newSessionId, transport);
                 },
               });
 
