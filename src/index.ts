@@ -461,6 +461,48 @@ async function runServer(): Promise<void> {
       // Store transports and servers by session ID
       const transports: { [sessionId: string]: WebStandardStreamableHTTPServerTransport } = {};
       const servers: { [sessionId: string]: McpServer } = {};
+      const sessionLastActive: { [sessionId: string]: number } = {};
+      
+      // Session timeout in milliseconds (5 minutes)
+      const SESSION_TIMEOUT = 5 * 60 * 1000;
+      
+      // Helper to clean up a specific session
+      const cleanupSession = (sessionId: string) => {
+        if (transports[sessionId]) {
+          process.stderr.write(`[${new Date().toISOString()}] Cleaning up session: ${sessionId}\n`);
+          delete transports[sessionId];
+        }
+        if (servers[sessionId]) {
+          try {
+            servers[sessionId].close();
+          } catch (error) {
+            process.stderr.write(`  Warning: Error closing server for session ${sessionId}: ${error}\n`);
+          }
+          delete servers[sessionId];
+        }
+        if (sessionLastActive[sessionId]) {
+          delete sessionLastActive[sessionId];
+        }
+      };
+      
+      // Periodic cleanup of inactive sessions
+      const cleanupInterval = setInterval(() => {
+        const now = Date.now();
+        const inactiveSessions: string[] = [];
+        
+        for (const [sessionId, lastActive] of Object.entries(sessionLastActive)) {
+          if (now - lastActive > SESSION_TIMEOUT) {
+            inactiveSessions.push(sessionId);
+          }
+        }
+        
+        if (inactiveSessions.length > 0) {
+          process.stderr.write(`[${new Date().toISOString()}] Cleaning up ${inactiveSessions.length} inactive session(s)\n`);
+          for (const sessionId of inactiveSessions) {
+            cleanupSession(sessionId);
+          }
+        }
+      }, 60 * 1000); // Check every minute
 
       // Helper to convert Node.js request to Web Standard Request
       const toWebRequest = (req: any, body?: unknown): Request => {
@@ -561,6 +603,8 @@ async function runServer(): Promise<void> {
 
           if (sessionId && transports[sessionId]) {
             process.stderr.write(`  → Reusing existing session\n`);
+            // Update last active timestamp
+            sessionLastActive[sessionId] = Date.now();
             // Reuse existing transport for established sessions
             transport = transports[sessionId];
 
@@ -596,17 +640,14 @@ async function runServer(): Promise<void> {
                 onsessioninitialized: (newSessionId: string) => {
                   transports[newSessionId] = transport;
                   servers[newSessionId] = mcpServer;
+                  sessionLastActive[newSessionId] = Date.now();
                 },
               });
 
               transport.onclose = () => {
                 const sid = transport.sessionId;
-                if (sid && transports[sid]) {
-                  delete transports[sid];
-                  if (servers[sid]) {
-                    servers[sid].close();
-                    delete servers[sid];
-                  }
+                if (sid) {
+                  cleanupSession(sid);
                 }
               };
 
@@ -622,6 +663,7 @@ async function runServer(): Promise<void> {
               if (responseSessionId) {
                 transports[responseSessionId] = transport;
                 servers[responseSessionId] = mcpServer;
+                sessionLastActive[responseSessionId] = Date.now();
                 process.stderr.write(`  → Session registered: ${responseSessionId}\n`);
               }
 
@@ -713,6 +755,19 @@ async function runServer(): Promise<void> {
       // Handle shutdown gracefully
       const shutdown = () => {
         process.stderr.write('\nShutting down...\n');
+        
+        // Clear cleanup interval
+        clearInterval(cleanupInterval);
+        
+        // Clean up all active sessions
+        const activeSessions = Object.keys(transports);
+        if (activeSessions.length > 0) {
+          process.stderr.write(`Cleaning up ${activeSessions.length} active session(s)...\n`);
+          for (const sessionId of activeSessions) {
+            cleanupSession(sessionId);
+          }
+        }
+        
         httpServer.close(() => {
           process.exit(0);
         });

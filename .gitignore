@@ -29,6 +29,7 @@ build/
 # 编辑器目录和文件
 .idea/
 .vscode/
+.serena/
 *.swp
 *.swo
 
