@@ -10,6 +10,7 @@ import { bingSearch, duckDuckGoSearch, searxngSearch, tavilySearch, localSearch,
 import { SEARCH_TOOL, EXTRACT_TOOL, SCRAPE_TOOL, MAP_TOOL } from './tools.js';
 import type { SearchInput, MapInput, ScrapeInput, ExtractInput } from './schemas.js';
 import { AgentBrowser } from './libs/agent-browser/index.js';
+import { InMemoryEventStore } from './eventStore.js';
 import dotenvx from '@dotenvx/dotenvx';
 import { SafeSearchType } from 'duck-duck-scrape';
 
@@ -117,6 +118,13 @@ server.registerTool(
   },
   createToolHandler(SEARCH_TOOL.name, async (args: SearchInput) => {
     const config = getSearchConfig();
+    
+    // Send progress notification: search started
+    await server.sendLoggingMessage({
+      level: 'info',
+      data: `[${new Date().toISOString()}] Search started: query="${args.query}", provider=${config.provider}`,
+    });
+
     const { results, success } = await processSearch({
       ...args,
       apiKey: config.apiKey ?? '',
@@ -124,8 +132,18 @@ server.registerTool(
     });
 
     if (!success) {
+      await server.sendLoggingMessage({
+        level: 'error',
+        data: `[${new Date().toISOString()}] Search failed`,
+      });
       throw new Error('Failed to search');
     }
+
+    // Send progress notification: search completed
+    await server.sendLoggingMessage({
+      level: 'info',
+      data: `[${new Date().toISOString()}] Search completed: ${results.length} results found`,
+    });
 
     const resultsText = results.map((result) => (
       `Title: ${result.title}
@@ -647,6 +665,8 @@ async function runServer(): Promise<void> {
 
               transport = new WebStandardStreamableHTTPServerTransport({
                 sessionIdGenerator: () => randomUUID(),
+                eventStore: new InMemoryEventStore(),
+                retryInterval: 2000,
                 onsessioninitialized: (newSessionId: string) => {
                   transports[newSessionId] = transport;
                   servers[newSessionId] = mcpServer;
