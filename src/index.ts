@@ -462,10 +462,10 @@ async function runServer(): Promise<void> {
       const transports: { [sessionId: string]: WebStandardStreamableHTTPServerTransport } = {};
       const servers: { [sessionId: string]: McpServer } = {};
       const sessionLastActive: { [sessionId: string]: number } = {};
-      
+
       // Session timeout in milliseconds (5 minutes)
       const SESSION_TIMEOUT = 5 * 60 * 1000;
-      
+
       // Helper to clean up a specific session
       const cleanupSession = (sessionId: string) => {
         if (transports[sessionId]) {
@@ -484,18 +484,18 @@ async function runServer(): Promise<void> {
           delete sessionLastActive[sessionId];
         }
       };
-      
+
       // Periodic cleanup of inactive sessions
       const cleanupInterval = setInterval(() => {
         const now = Date.now();
         const inactiveSessions: string[] = [];
-        
+
         for (const [sessionId, lastActive] of Object.entries(sessionLastActive)) {
           if (now - lastActive > SESSION_TIMEOUT) {
             inactiveSessions.push(sessionId);
           }
         }
-        
+
         if (inactiveSessions.length > 0) {
           process.stderr.write(`[${new Date().toISOString()}] Cleaning up ${inactiveSessions.length} inactive session(s)\n`);
           for (const sessionId of inactiveSessions) {
@@ -755,10 +755,10 @@ async function runServer(): Promise<void> {
       // Handle shutdown gracefully
       const shutdown = () => {
         process.stderr.write('\nShutting down...\n');
-        
+
         // Clear cleanup interval
         clearInterval(cleanupInterval);
-        
+
         // Clean up all active sessions
         const activeSessions = Object.keys(transports);
         if (activeSessions.length > 0) {
@@ -767,7 +767,7 @@ async function runServer(): Promise<void> {
             cleanupSession(sessionId);
           }
         }
-        
+
         httpServer.close(() => {
           process.exit(0);
         });
