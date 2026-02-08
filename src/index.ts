@@ -691,6 +691,24 @@ async function runServer(): Promise<void> {
               }));
               return;
             }
+          } else if (req.method === 'GET') {
+            // GET request without session ID - MCP client checking for SSE support
+            // Return 405 Method Not Allowed as per MCP spec (we don't support SSE streams)
+            process.stderr.write(`  → GET request without session ID (SSE check)\n`);
+            process.stderr.write(`  ← Returning 405 Method Not Allowed (no SSE support)\n`);
+            res.writeHead(405, {
+              'Content-Type': 'application/json',
+              'Allow': 'POST',
+            });
+            res.end(JSON.stringify({
+              jsonrpc: '2.0',
+              error: {
+                code: -32000,
+                message: 'Method Not Allowed: SSE streams not supported. Use POST for stateless requests.',
+              },
+              id: null,
+            }));
+            return;
           } else {
             // Invalid request
             process.stderr.write(`  ✗ Invalid request: method=${req.method}, sessionId=${sessionId}\n`);
