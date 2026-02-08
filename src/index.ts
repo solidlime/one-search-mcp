@@ -757,6 +757,14 @@ async function runServer(): Promise<void> {
         }
       });
 
+      // Configure server timeouts to prevent session disconnections
+      // Keep-alive timeout should be longer than typical idle periods
+      httpServer.keepAliveTimeout = 120000; // 120 seconds
+      // Headers timeout should be slightly longer than keep-alive timeout
+      httpServer.headersTimeout = 125000; // 125 seconds
+      // Request timeout for the entire request (0 = no timeout)
+      httpServer.requestTimeout = 0;
+
       httpServer.listen(port, () => {
         process.stderr.write(`OneSearch MCP server (Streamable HTTP) listening on http://0.0.0.0:${port}\n`);
         process.stderr.write(`Endpoint: http://0.0.0.0:${port}/mcp\n`);
