@@ -1,4 +1,3 @@
-````skill
 ---
 name: one-search
 description: 複数の検索エンジンを統合した検索スキル。Web検索、ページスクレイピング、URLマッピング、構造化データ抽出を提供します。
@@ -7,6 +6,21 @@ description: 複数の検索エンジンを統合した検索スキル。Web検�
 # OneSearch Skill
 
 Web検索とコンテンツ抽出を行います。npxコマンドで簡単に操作できます。
+
+## インストール
+
+### 自動実行（推奨）
+npxを使えばインストール不要で実行できます：
+```bash
+npx one-search-skill health
+```
+
+### グローバルインストール
+頻繁に使う場合はグローバルインストールも可能：
+```bash
+npm install -g one-search-mcp
+one-search-skill health
+```
 
 ## 設定
 MCPサーバーのアドレスを環境変数で指定：
@@ -136,9 +150,3 @@ npx one-search-skill extract '{
 3. **環境変数の永続化**: `.bashrc` や `.zshrc` に `export ONE_SEARCH_URL=...` を追加
 4. **プロバイダー選択**: サーバー側で環境変数 `SEARCH_PROVIDER` で設定
 5. **アクション活用**: 動的コンテンツは `actions` で読み込みを待機
-
----
-
-**作成日**: 2026年2月9日
-**バージョン**: 2.0 (npx対応版)
-````
