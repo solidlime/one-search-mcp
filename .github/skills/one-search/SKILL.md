@@ -5,21 +5,33 @@ description: 複数の検索エンジンを統合した検索スキル。Web検�
 
 # OneSearch Skill
 
-Web検索とコンテンツ抽出を行います。npxコマンドで簡単に操作できます。
+Web検索とコンテンツ抽出を行います。
 
 ## インストール
 
-### 自動実行（推奨）
-npxを使えばインストール不要で実行できます：
+### GitHubから直接インストール（推奨）
 ```bash
-npx one-search-skill health
+# グローバルインストール
+npm install -g yokingma/one-search-mcp
+
+# インストール後、コマンド実行
+one-search-skill health
 ```
 
-### グローバルインストール
-頻繁に使う場合はグローバルインストールも可能：
+### npmレジストリから（v1.2.0公開後）
 ```bash
+# npxで自動インストール＆実行
+npx one-search-skill health
+
+# またはグローバルインストール
 npm install -g one-search-mcp
-one-search-skill health
+```
+
+### ローカル開発用
+```bash
+# リポジトリのルートディレクトリで
+npm run build
+npm link
 ```
 
 ## 設定
