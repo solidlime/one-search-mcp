@@ -639,6 +639,14 @@ async function runServer(): Promise<void> {
 
       // Parse JSON body
       const parseBody = async (req: any): Promise<unknown> => {
+        // If Express already parsed the body, use it directly
+        if (req.body && typeof req.body === 'object') {
+          const bodyStr = JSON.stringify(req.body);
+          process.stderr.write(`  Body (pre-parsed by Express, ${bodyStr.length} bytes): ${bodyStr.substring(0, 200)}${bodyStr.length > 200 ? '...' : ''}\n`);
+          return req.body;
+        }
+
+        // Otherwise, read from stream
         const chunks: Buffer[] = [];
         for await (const chunk of req) {
           chunks.push(chunk as Buffer);
