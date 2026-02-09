@@ -488,7 +488,7 @@ async function runServer(): Promise<void> {
       // Session timeout in milliseconds (default: 10 minutes, configurable via SESSION_TIMEOUT_MINUTES)
       const SESSION_TIMEOUT_MINUTES = parseInt(process.env.SESSION_TIMEOUT_MINUTES || '10', 10);
       const SESSION_TIMEOUT = SESSION_TIMEOUT_MINUTES * 60 * 1000;
-      
+
       process.stderr.write(`Session timeout: ${SESSION_TIMEOUT_MINUTES} minutes\n`);
 
       // Start SSE keep-alive for a session
@@ -724,9 +724,9 @@ async function runServer(): Promise<void> {
             res.writeHead(400, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({
               jsonrpc: '2.0',
-              error: { 
-                code: -32000, 
-                message: `Session not found: ${sessionId}. Session may have expired or been cleaned up.` 
+              error: {
+                code: -32000,
+                message: `Session not found: ${sessionId}. Session may have expired or been cleaned up.`
               },
               id: null,
             }));
