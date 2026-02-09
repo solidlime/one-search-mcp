@@ -21,7 +21,7 @@ def get_server_url():
     # 1. Try to load from config.json
     script_dir = os.path.dirname(os.path.abspath(__file__))
     skill_dir = os.path.dirname(script_dir)  # scripts/ の親
-    config_path = os.path.join(skill_dir, 'assets', 'config.json')
+    config_path = os.path.join(skill_dir, 'references', 'config.json')
 
     if os.path.exists(config_path):
         try:
@@ -39,7 +39,7 @@ def get_server_url():
     # 3. Error
     print('❌ エラー: サーバーURLが設定されていません', file=sys.stderr)
     print('\n設定方法1: 設定ファイル', file=sys.stderr)
-    print('  1. assets/config.example.json を assets/config.json にコピー', file=sys.stderr)
+    print('  1. references/config.example.json を references/config.json にコピー', file=sys.stderr)
     print('  2. mcp_server_url を編集', file=sys.stderr)
     print('\n設定方法2: 環境変数', file=sys.stderr)
     print('  export ONE_SEARCH_URL=http://localhost:8000', file=sys.stderr)

@@ -15,10 +15,10 @@ Execute web searches, scrape webpage content, discover URLs from websites, and e
 
 1. Copy the example config:
 ```bash
-cp assets/config.example.json assets/config.json
+cp references/config.example.json references/config.json
 ```
 
-2. Edit `assets/config.json` with your server URL:
+2. Edit `references/config.json` with your server URL:
 ```json
 {
   "mcp_server_url": "http://your-server:8000"
