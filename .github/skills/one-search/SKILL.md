@@ -1,71 +1,65 @@
 ---
 name: one-search
-description: 複数の検索エンジンを統合した検索スキル。Web検索、ページスクレイピング、URLマッピング、構造化データ抽出を提供します。
+description: Web search, scraping, URL discovery, and data extraction using OneSearch MCP server. Use for web research, content collection, site mapping, and extracting structured data from websites.
 ---
 
-# OneSearch Skill
+# OneSearch
 
-Web検索とコンテンツ抽出を行います。
+## Overview
 
-## インストール
+Execute web searches, scrape webpage content, discover URLs from websites, and extract structured data using the OneSearch MCP server's REST API.
 
-### GitHubから直接インストール（現在の方法）
+## Setup
+
+Set the OneSearch server URL:
+
 ```bash
-# グローバルインストール
-npm install -g yokingma/one-search-mcp
-
-# MCPサーバーのアドレスを環境変数で指定
-export ONE_SEARCH_URL=http://nas:8000
-
-# コマンド実行
-one-search-skill health
+export ONE_SEARCH_URL=http://localhost:8000
 ```
 
-### npmレジストリから（v1.2.0公開後）
-```bash
-# npxで自動インストール＆実行
-npx one-search-skill health
-
-# またはグローバルインストール
-npm install -g one-search-mcp
+Windows PowerShell:
+```powershell
+$env:ONE_SEARCH_URL="http://localhost:8000"
 ```
 
-> **注意**: npxはnpmレジストリ公開後のみ使用可能です。  
-> 現在はGitHubから`npm install -g yokingma/one-search-mcp`でインストールしてください。
+## Quick Start
 
-## 使い方
-
-### Web検索
+**Web Search**:
 ```bash
-one-search-skill search '{"query": "TypeScript tutorial", "limit": 5}'
+python scripts/search.py '{"query": "AI news", "limit": 10}'
 ```
 
-### ページスクレイピング
+**Scrape Page**:
 ```bash
-one-search-skill scrape '{"url": "https://example.com", "formats": ["markdown"]}'
+python scripts/scrape.py '{"url": "https://example.com", "formats": ["markdown"]}'
 ```
 
-### URLマッピング
+**Discover URLs**:
 ```bash
-one-search-skill map '{"url": "https://example.com", "limit": 100}'
+python scripts/map.py '{"url": "https://example.com", "limit": 100}'
 ```
 
-### データ抽出
+**Extract Data**:
 ```bash
-one-search-skill extract '{"urls": ["https://example.com"], "prompt": "タイトルを抽出"}'
+python scripts/extract.py '{"urls": ["https://example.com"], "prompt": "Extract main topics"}'
 ```
 
-### サーバー健全性チェック
+## Web Search
+
+Execute web searches and retrieve results.
+
+**Script**: `scripts/search.py`
+
+**Parameters**:
+- `query` (required): Search keywords
+- `limit`: Number of results (default: 10)
+- `language`: Language code (`en`, `ja`, `auto`)
+- `categories`: Category filter (`general`, `news`, `images`, `it`, `science`)
+- `timeRange`: Time filter (`all`, `day`, `week`, `month`, `year`)
+
+**Example**:
 ```bash
-one-search-skill health
-```
-
-## 主な操作
-
-### search - Web検索
-
-```bash
-one-search-skill search '{
+python scripts/search.py '{
   "query": "TypeScript MCP",
   "limit": 10,
   "language": "auto",
@@ -73,25 +67,31 @@ one-search-skill search '{
 }'
 ```
 
-**パラメータ**:
-- `query` (必須): 検索キーワード
-- `limit`: 取得件数（デフォルト: 10）
-- `language`: 言語コード（`en`, `ja`, `auto`）
-- `categories`: `general`, `news`, `images`, `videos`, `it`, `science`, `map`, `music`, `files`, `social_media`
-- `timeRange`: `all`, `day`, `week`, `month`, `year`
+## Web Scraping
 
-### scrape - ページスクレイピング
+Scrape webpage content with optional browser automation.
 
+**Script**: `scripts/scrape.py`
+
+**Parameters**:
+- `url` (required): Target URL
+- `formats`: Output formats (`markdown`, `html`, `rawHtml`, `screenshot`, `links`)
+- `onlyMainContent`: Extract only main content (default: true)
+- `waitFor`: Wait time in milliseconds for dynamic content
+- `actions`: Browser automation actions (click, scroll, wait, etc.)
+
+**Basic Scraping**:
 ```bash
-# 基本的なスクレイピング
-one-search-skill scrape '{
+python scripts/scrape.py '{
   "url": "https://example.com/article",
   "formats": ["markdown"],
   "onlyMainContent": true
 }'
+```
 
-# アクション実行後にスクレイピング
-one-search-skill scrape '{
+**With Browser Actions**:
+```bash
+python scripts/scrape.py '{
   "url": "https://example.com",
   "actions": [
     {"type": "wait", "milliseconds": 2000},
@@ -101,56 +101,82 @@ one-search-skill scrape '{
 }'
 ```
 
-**パラメータ**:
-- `url` (必須): スクレイピング対象URL
-- `formats`: `markdown`, `html`, `rawHtml`, `screenshot`, `links`, `screenshot@fullPage`, `extract`
-- `onlyMainContent`: メインコンテンツのみ抽出
-- `waitFor`: 動的コンテンツ読み込み待機時間（ms）
-- `actions`: 実行するアクション配列
+## URL Discovery
 
-**アクションタイプ**: `wait`, `click`, `screenshot`, `write`, `press`, `scroll`, `scrape`, `executeJavascript`
+Discover and map URLs from a website.
 
-### map - URLマッピング
+**Script**: `scripts/map.py`
 
+**Parameters**:
+- `url` (required): Starting URL
+- `search`: Filter URLs by keyword
+- `limit`: Maximum URLs to discover (default: 100)
+- `ignoreSitemap`: Skip sitemap.xml
+- `sitemapOnly`: Only use sitemap.xml
+- `includeSubdomains`: Include subdomains
+
+**Example**:
 ```bash
-one-search-skill map '{
+python scripts/map.py '{
   "url": "https://example.com",
   "search": "tutorial",
   "limit": 100
 }'
 ```
 
-**パラメータ**:
-- `url` (必須): 開始URL
-- `search`: URLフィルター用キーワード
-- `ignoreSitemap`: sitemap.xmlをスキップ
-- `sitemapOnly`: sitemap.xmlのみ使用
-- `includeSubdomains`: サブドメインも含める
-- `limit`: 取得URL数の上限
+## Data Extraction
 
-### extract - 構造化データ抽出
+Extract structured data from multiple URLs using AI.
 
+**Script**: `scripts/extract.py`
+
+**Parameters**:
+- `urls` (required): Array of URLs to extract from
+- `prompt` (required): Extraction instructions
+- `schema`: Optional JSON schema for structured output
+
+**Example**:
 ```bash
-one-search-skill extract '{
+python scripts/extract.py '{
   "urls": [
     "https://example.com/product1",
     "https://example.com/product2"
   ],
-  "prompt": "商品名、価格、在庫状況を抽出してください"
+  "prompt": "Extract product name, price, and availability"
 }'
 ```
 
-**パラメータ**:
-- `urls` (必須): 抽出対象URLの配列
-- `schema`: 構造化データのスキーマ定義（オプション）
-- `prompt`: LLM抽出用プロンプト
-- `systemPrompt`: システムプロンプト（オプション）
-- `enableWebSearch`: 追加コンテキストのためWeb検索を有効化（オプション）
+### scripts/
+Executable code (Python/Bash/etc.) that can be run directly to perform specific operations.
 
-## コツ
+**Examples from other skills:**
+- PDF skill: `fill_fillable_fields.py`, `extract_form_field_info.py` - utilities for PDF manipulation
+- DOCX skill: `document.py`, `utilities.py` - Python modules for document processing
 
-1. **limit設定**: 必要最小限の件数だけ取得して高速化
-2. **onlyMainContent**: スクレイピング時は不要な部分を除外
-3. **環境変数の永続化**: `.bashrc` や `.zshrc` に `export ONE_SEARCH_URL=...` を追加
-4. **プロバイダー選択**: サーバー側で環境変数 `SEARCH_PROVIDER` で設定
-5. **アクション活用**: 動的コンテンツは `actions` で読み込みを待機
+**Appropriate for:** Python scripts, shell scripts, or any executable code that performs automation, data processing, or specific operations.
+
+**Note:** Scripts may be executed without loading into context, but can still be read by Codex for patching or environment adjustments.
+
+### references/
+Documentation and reference material intended to be loaded into context to inform Codex's process and thinking.
+
+**Examples from other skills:**
+- Product management: `communication.md`, `context_building.md` - detailed workflow guides
+- BigQuery: API reference documentation and query examples
+- Finance: Schema documentation, company policies
+
+**Appropriate for:** In-depth documentation, API references, database schemas, comprehensive guides, or any detailed information that Codex should reference while working.
+
+### assets/
+Files not intended to be loaded into context, but rather used within the output Codex produces.
+
+**Examples from other skills:**
+- Brand styling: PowerPoint template files (.pptx), logo files
+- Frontend builder: HTML/React boilerplate project directories
+- Typography: Font files (.ttf, .woff2)
+
+**Appropriate for:** Templates, boilerplate code, document templates, images, icons, fonts, or any files meant to be copied or used in the final output.
+
+---
+
+**Not every skill requires all three types of resources.**
