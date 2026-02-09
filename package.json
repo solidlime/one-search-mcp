@@ -31,8 +31,7 @@
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "bin": {
-    "one-search-mcp": "dist/index.js",
-    "one-search-skill": "dist/cli.js"
+    "one-search-mcp": "dist/index.js"
   },
   "files": [
     "dist/**"
@@ -46,11 +45,9 @@
   "scripts": {
     "dev": "dotenvx run --quiet -- cross-env NODE_ENV=development tsx src/index.ts",
     "dev:api": "dotenvx run --quiet -- cross-env NODE_ENV=development tsx src/api-server.ts",
-    "dev:cli": "dotenvx run --quiet -- cross-env NODE_ENV=development tsx src/cli.ts",
-    "build": "npm run build:mcp && npm run build:api && npm run build:cli",
+    "build": "npm run build:mcp && npm run build:api",
     "build:mcp": "tsup",
     "build:api": "tsup src/api-server.ts src/api-routes.ts --format cjs,esm --no-dts --clean false",
-    "build:cli": "tsup src/cli.ts --format esm --no-dts --clean false",
     "start": "node dist/index.js",
     "start:api": "node dist/api-server.js",
     "lint": "eslint src",
