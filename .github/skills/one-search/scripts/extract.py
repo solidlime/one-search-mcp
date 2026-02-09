@@ -15,18 +15,56 @@ import sys
 import urllib.request
 import urllib.error
 
+# 環境変数でPythonのI/OエンコーディングをUTF-8に強制
+os.environ['PYTHONIOENCODING'] = 'utf-8'
+
+# コンソール出力のエンコーディングをUTF-8に設定（Windows対応）
+if sys.platform == "win32":
+    import io
+    import ctypes
+
+    # Windows APIでコンソールをUTF-8モードに設定
+    try:
+        # コンソールの出力コードページをUTF-8 (65001) に設定
+        kernel32 = ctypes.windll.kernel32
+        kernel32.SetConsoleOutputCP(65001)
+        kernel32.SetConsoleCP(65001)
+    except Exception:
+        pass  # 失敗しても続行（管理者権限不要の環境用）
+
+    # stdout/stderrをUTF-8でラップ
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace', line_buffering=True)
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace', line_buffering=True)
+else:
+    # Linux/Macでもエンコーディングを明示
+    import io
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace', line_buffering=True)
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace', line_buffering=True)
+
 
 def get_server_url():
     """Get server URL from config file or environment variable"""
     # 1. Try to load from config.json
     script_dir = os.path.dirname(os.path.abspath(__file__))
     skill_dir = os.path.dirname(script_dir)  # scripts/ の親
+
+    # config.jsonのパスを決定（skill_root_pathが設定されていればそれを使用）
     config_path = os.path.join(skill_dir, 'references', 'config.json')
 
+    config = None
     if os.path.exists(config_path):
         try:
             with open(config_path, 'r', encoding='utf-8') as f:
                 config = json.load(f)
+
+                # skill_root_pathが設定されている場合はそれを使用
+                if config.get('skill_root_path'):
+                    skill_dir = config['skill_root_path']
+                    config_path = os.path.join(skill_dir, 'references', 'config.json')
+                    # 再度読み込み
+                    with open(config_path, 'r', encoding='utf-8') as f2:
+                        config = json.load(f2)
+
                 return config.get('mcp_server_url')
         except Exception as e:
             print(f'⚠ 警告: 設定ファイル読み込みエラー: {{e}}', file=sys.stderr)

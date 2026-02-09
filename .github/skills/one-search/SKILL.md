@@ -11,6 +11,10 @@ Execute web searches, scrape webpage content, discover URLs from websites, and e
 
 ## Setup
 
+**Prerequisites:**
+- Python 3.7 or higher
+- OneSearch MCP server running (see main README.md)
+
 **Method 1: Configuration File (Recommended)**
 
 1. Copy the example config:
@@ -21,9 +25,14 @@ cp references/config.example.json references/config.json
 2. Edit `references/config.json` with your server URL:
 ```json
 {
-  "mcp_server_url": "http://your-server:8000"
+  "mcp_server_url": "http://your-server:8000",
+  "skill_root_path": null
 }
 ```
+
+> **Note**:
+> - `mcp_server_url`: Required. URL of your OneSearch MCP server
+> - `skill_root_path`: Optional. Absolute path to skill root directory. If `null`, scripts auto-detect their location using `__file__`. Set this when using the skill as a global skill outside the workspace.
 
 **Method 2: Environment Variable**
 
@@ -39,6 +48,37 @@ $env:ONE_SEARCH_URL="http://localhost:8000"
 ```
 
 > **Note**: Configuration file takes priority over environment variable.
+
+**For Global Skills (outside workspace):**
+
+When using this skill as a global skill (not in the current workspace), set the `skill_root_path` in config.json:
+
+```json
+{
+  "mcp_server_url": "http://localhost:8000",
+  "skill_root_path": "/Users/you/.claude/skills/one-search"
+}
+```
+
+Windows example:
+```json
+{
+  "mcp_server_url": "http://localhost:8000",
+  "skill_root_path": "C:\\Users\\You\\.claude\\skills\\one-search"
+}
+```
+
+> **Note**: When `skill_root_path` is `null`, scripts automatically detect their location using `__file__`. This works perfectly for workspace-local skills.
+
+**Windows Encoding Fix:**
+
+All scripts include automatic UTF-8 encoding for Windows environments. If you still encounter encoding issues, ensure your terminal supports UTF-8:
+
+```powershell
+# PowerShell
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+chcp 65001
+```
 
 ## Quick Start
 

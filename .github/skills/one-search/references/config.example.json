@@ -1,3 +1,9 @@
 {
-  "mcp_server_url": "http://localhost:8000"
+  "mcp_server_url": "http://localhost:8000",
+  "skill_root_path": null,
+  "_comments": {
+    "mcp_server_url": "Required: URL of the OneSearch MCP server",
+    "skill_root_path": "Optional: Absolute path to skill root directory. Set this when using as a global skill. If null, auto-detects from script location.",
+    "example_global": "For global skill: set to '/Users/you/.claude/skills/one-search' or 'C:\\\\Users\\\\You\\\\.claude\\\\skills\\\\one-search'"
+  }
 }
