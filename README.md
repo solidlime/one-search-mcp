@@ -57,22 +57,77 @@ npx -y one-search-mcp streamable-http --port=8000
     "one-search-mcp": {
       "url": "http://localhost:8000",
       "transport": "streamable-http",
-      "timeout": 60000,
-      "headers": {
-        "X-Search-Provider": "searxng",
-        "X-Search-API-URL": "http://localhost:8080",
-        "X-Search-Timeout": "30000"
-      }
+      "timeout": 60000
     }
   }
 }
 ```
 
+### Unified MCP + REST API Server (Recommended)
+
+**NEW**: Run both MCP and REST API endpoints on a single server! No need for separate Docker containers.
+
+1. Start the unified server:
+```bash
+npx -y one-search-mcp streamable-http --port=8000
+```
+
+2. Access both interfaces:
+   - **MCP endpoint**: `http://localhost:8000/mcp` (for LibreChat, Claude Desktop with HTTP)
+   - **REST API**: `http://localhost:8000/api/tools/*` (for custom integrations)
+
+**Available REST API endpoints:**
+```bash
+# Search
+POST http://localhost:8000/api/tools/search
+Content-Type: application/json
+{"query": "AI news", "limit": 10}
+
+# Scrape
+POST http://localhost:8000/api/tools/scrape
+{"url": "https://example.com"}
+
+# Map (discover URLs)
+POST http://localhost:8000/api/tools/map
+{"url": "https://example.com"}
+
+# Extract (structured data)
+POST http://localhost:8000/api/tools/extract
+{"urls": ["https://example.com"], "prompt": "Extract main topics"}
+
+# Health check
+GET http://localhost:8000/health
+
+# Server info
+GET http://localhost:8000/api/info
+```
+
+**Benefits:**
+- ✅ Single server process for both MCP and REST API
+- ✅ One Docker container instead of two
+- ✅ Shared configuration and resources
+- ✅ Easier deployment and management
+
+### Standalone REST API Server (API-only)
+
+If you only need the REST API without MCP:
+
+```bash
+# Development
+npm run dev:api
+
+# Production
+npm run build
+npm run start:api
+
+# Or docker
+docker build -t one-search-api .
+docker run -p 8000:8000 one-search-api
+```
+
 ## 🔧 Configuration
 
 ### Search Providers
-
-Choose your search provider using the `SEARCH_PROVIDER` environment variable or `X-Search-Provider` header:
 
 | Provider | Description | API Key Required | Configuration |
 |----------|-------------|------------------|---------------|
@@ -110,20 +165,6 @@ ENGINES=all                     # Specific engines to use
 SEARCH_USER_AGENT=Mozilla/5.0...  # Custom user agent
 HEADLESS=true                   # Headless browser mode (default: true)
 ```
-
-### Custom Headers (HTTP Mode Only)
-
-Override configuration per-request using HTTP headers. **Headers take priority over environment variables.**
-
-| Header | Description | Example |
-|--------|-------------|---------|
-| `X-Search-Provider` | Search provider | `searxng` |
-| `X-Search-API-URL` | API endpoint | `http://localhost:8080` |
-| `X-Search-API-Key` | API key | `your-api-key` |
-| `X-User-Agent` | User agent string | `Mozilla/5.0...` |
-| `X-Search-Timeout` | Request timeout (ms) | `30000` |
-
-**Priority Order:** HTTP Headers > Environment Variables > Defaults
 
 ## 📋 Prerequisites
 

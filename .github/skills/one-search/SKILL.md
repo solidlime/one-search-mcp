@@ -1,3 +1,4 @@
+````skill
 ---
 name: one-search
 description: 複数の検索エンジンを統合した検索スキル。Web検索、ページスクレイピング、URLマッピング、構造化データ抽出を提供します。
@@ -5,35 +6,57 @@ description: 複数の検索エンジンを統合した検索スキル。Web検�
 
 # OneSearch Skill
 
-Web検索とコンテンツ抽出を行います。簡単なPythonスクリプトで操作できます。
+Web検索とコンテンツ抽出を行います。npxコマンドで簡単に操作できます。
+
+## 設定
+
+MCPサーバーのアドレスを環境変数で指定してください：
+
+```bash
+ONE_SEARCH_URL=http://localhost:8000
+```
+
+Docker等でサーバーを別ホストで動かしている場合：
+
+```bash
+ONE_SEARCH_URL=http://nas:8000
+```
+
+> **注意**: `ONE_SEARCH_URL`環境変数が設定されていない場合、エラーメッセージが表示されます。
 
 ## 使い方
 
+### Web検索
 ```bash
-# スクリプトの場所に移動
-cd .github/skills/scripts
+npx one-search-skill search '{"query": "TypeScript tutorial", "limit": 5}'
+```
 
-# Web検索
-python one_search_mcp.py search '{"query": "TypeScript tutorial", "limit": 5}'
+### ページスクレイピング
+```bash
+npx one-search-skill scrape '{"url": "https://example.com", "formats": ["markdown"]}'
+```
 
-# ページスクレイピング
-python one_search_mcp.py scrape '{"url": "https://example.com", "formats": ["markdown"]}'
+### URLマッピング
+```bash
+npx one-search-skill map '{"url": "https://example.com", "limit": 100}'
+```
 
-# URLマッピング
-python one_search_mcp.py map '{"url": "https://example.com", "limit": 100}'
+### データ抽出
+```bash
+npx one-search-skill extract '{"urls": ["https://example.com"], "prompt": "タイトルを抽出"}'
+```
 
-# データ抽出
-python one_search_mcp.py extract '{"urls": ["https://example.com"], "prompt": "タイトルを抽出"}'
-
-# サーバー健全性チェック
-python one_search_mcp.py health
+### サーバー健全性チェック
+```bash
+npx one-search-skill health
 ```
 
 ## 主な操作
 
 ### search - Web検索
+
 ```bash
-python one_search_mcp.py search '{
+npx one-search-skill search '{
   "query": "TypeScript MCP",
   "limit": 10,
   "language": "auto",
@@ -49,16 +72,17 @@ python one_search_mcp.py search '{
 - `timeRange`: `all`, `day`, `week`, `month`, `year`
 
 ### scrape - ページスクレイピング
+
 ```bash
 # 基本的なスクレイピング
-python one_search_mcp.py scrape '{
+npx one-search-skill scrape '{
   "url": "https://example.com/article",
   "formats": ["markdown"],
   "onlyMainContent": true
 }'
 
 # アクション実行後にスクレイピング
-python one_search_mcp.py scrape '{
+npx one-search-skill scrape '{
   "url": "https://example.com",
   "actions": [
     {"type": "wait", "milliseconds": 2000},
@@ -78,8 +102,9 @@ python one_search_mcp.py scrape '{
 **アクションタイプ**: `wait`, `click`, `screenshot`, `write`, `press`, `scroll`, `scrape`, `executeJavascript`
 
 ### map - URLマッピング
+
 ```bash
-python one_search_mcp.py map '{
+npx one-search-skill map '{
   "url": "https://example.com",
   "search": "tutorial",
   "limit": 100
@@ -95,36 +120,88 @@ python one_search_mcp.py map '{
 - `limit`: 取得URL数の上限
 
 ### extract - 構造化データ抽出
+
 ```bash
-python one_search_mcp.py extract '{
+npx one-search-skill extract '{
   "urls": [
     "https://example.com/product1",
     "https://example.com/product2"
   ],
-  "schema": {
-    "name": "string",
-    "price": "number",
-    "inStock": "boolean"
-  },
   "prompt": "商品名、価格、在庫状況を抽出してください"
 }'
 ```
 
 **パラメータ**:
 - `urls` (必須): 抽出対象URLの配列
-- `schema`: 構造化データのスキーマ定義
+- `schema`: 構造化データのスキーマ定義（オプション）
 - `prompt`: LLM抽出用プロンプト
-- `systemPrompt`: システムプロンプト
-- `enableWebSearch`: 追加コンテキストのためWeb検索を有効化
+- `systemPrompt`: システムプロンプト（オプション）
+- `enableWebSearch`: 追加コンテキストのためWeb検索を有効化（オプション）
+
+## トラブルシューティング
+
+### 環境変数が設定されていません
+
+```
+❌ エラー: 環境変数 ONE_SEARCH_URL が設定されていません
+```
+
+**解決方法:**
+
+```bash
+# Linux/Mac
+export ONE_SEARCH_URL=http://localhost:8000
+npx one-search-skill search '{"query": "AI"}'
+
+# Windows PowerShell
+$env:ONE_SEARCH_URL="http://localhost:8000"
+npx one-search-skill search '{"query": "AI"}'
+
+# または一時的に設定
+ONE_SEARCH_URL=http://localhost:8000 npx one-search-skill search '{"query": "AI"}'
+```
+
+### サーバーへの接続に失敗しました
+
+```
+❌ エラー: サーバーへの接続に失敗しました
+```
+
+**確認事項:**
+1. MCPサーバーが起動していますか？
+2. `ONE_SEARCH_URL` が正しく設定されていますか？
+3. サーバーにアクセスできますか？（例: `http://localhost:8000/health` にブラウザでアクセス）
 
 ## コツ
 
 1. **limit設定**: 必要最小限の件数だけ取得して高速化
 2. **onlyMainContent**: スクレイピング時は不要な部分を除外
-3. **プロバイダー選択**: 開発は `local` や `duckduckgo`、本番は `searxng` が安定
-4. **タイムアウト調整**: 遅いサイトは `mcp-config.json` で `search_timeout` を増やす
+3. **環境変数の永続化**: `.bashrc` や `.zshrc` に `export ONE_SEARCH_URL=...` を追加
+4. **プロバイダー選択**: サーバー側で環境変数 `SEARCH_PROVIDER` で設定
 5. **アクション活用**: 動的コンテンツは `actions` で読み込みを待機
+
+## サーバー起動方法
+
+### 統合サーバー（MCP + REST API）
+
+```bash
+# Docker
+docker run -p 8000:8000 -e SEARCH_PROVIDER=local one-search-mcp
+
+# npm
+npx one-search-mcp streamable-http --port 8000
+```
+
+### API専用サーバー
+
+```bash
+# npm
+npm run build
+npm run start:api
+```
 
 ---
 
 **作成日**: 2026年2月9日
+**バージョン**: 2.0 (npx対応版)
+````

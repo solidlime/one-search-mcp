@@ -34,5 +34,6 @@ EXPOSE 8000
 USER pwuser
 
 # Command to run the MCP server in Streamable HTTP mode
-# To run with stdio instead, override CMD: docker run <image> node dist/index.js
+# To run with stdio instead: docker run <image> node dist/index.js
+# To run the REST API server: docker run <image> node dist/api-server.js
 CMD ["node", "dist/index.js", "streamable-http", "--port=8000"]

@@ -5,12 +5,15 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
 import { createServer as createHttpServer } from 'node:http';
 import { randomUUID } from 'node:crypto';
+import express from 'express';
+import cors from 'cors';
 import { ISearchRequestOptions, ISearchResponse, SearchProvider } from './interface.js';
 import { bingSearch, duckDuckGoSearch, searxngSearch, tavilySearch, localSearch, googleSearch, zhipuSearch, exaSearch, bochaSearch } from './search/index.js';
 import { SEARCH_TOOL, EXTRACT_TOOL, SCRAPE_TOOL, MAP_TOOL } from './tools.js';
 import type { SearchInput, MapInput, ScrapeInput, ExtractInput } from './schemas.js';
 import { AgentBrowser } from './libs/agent-browser/index.js';
 import { InMemoryEventStore } from './eventStore.js';
+import { createApiRouter } from './api-routes.js';
 import dotenvx from '@dotenvx/dotenvx';
 import { SafeSearchType } from 'duck-duck-scrape';
 
@@ -645,17 +648,38 @@ async function runServer(): Promise<void> {
         }
       };
 
-      const httpServer = createHttpServer(async (req, res) => {
-        // Only accept /mcp endpoint
-        if (req.url !== '/mcp' && req.url !== '/') {
-          res.writeHead(404, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({
-            jsonrpc: '2.0',
-            error: { code: -32000, message: 'Not Found: Use /mcp endpoint' },
-            id: null,
-          }));
-          return;
-        }
+      // Create Express app for combined MCP + REST API server
+      const app = express();
+
+      // Middleware
+      app.use(cors());
+      app.use(express.json({ limit: '50mb' }));
+
+      // Request logging middleware
+      app.use((req, res, next) => {
+        const startTime = Date.now();
+        res.on('finish', () => {
+          const duration = Date.now() - startTime;
+          console.log(`[${new Date().toISOString()}] ${req.method} ${req.path} - ${res.statusCode} (${duration}ms)`);
+        });
+        next();
+      });
+
+      // Mount REST API routes under /api
+      app.use('/api', createApiRouter());
+
+      // Health check (also available at root level)
+      app.get('/health', (_req, res) => {
+        res.json({
+          status: 'ok',
+          timestamp: new Date().toISOString(),
+          version: '1.2.0',
+          modes: ['mcp', 'api'],
+        });
+      });
+
+      // MCP endpoint handler
+      app.all('/mcp', async (req, res) => {
 
         // Get session ID from header (handle both string and array)
         const sessionIdRaw = req.headers['mcp-session-id'];
@@ -668,27 +692,7 @@ async function runServer(): Promise<void> {
         process.stderr.write(`  Content-Type: ${req.headers['content-type'] || 'none'}\n`);
         process.stderr.write(`  Active sessions: ${Object.keys(transports).join(', ') || 'none'}\n`);
 
-        // Read custom headers for search configuration (streamable-http mode)
-        const headerProvider = req.headers['x-search-provider'] as string | undefined;
-        const headerApiUrl = req.headers['x-search-api-url'] as string | undefined;
-        const headerApiKey = req.headers['x-search-api-key'] as string | undefined;
-        const headerUserAgent = req.headers['x-user-agent'] as string | undefined;
-        const headerTimeout = req.headers['x-search-timeout'] as string | undefined;
-
-        // Save original environment variables
-        const originalProvider = process.env.SEARCH_PROVIDER;
-        const originalApiUrl = process.env.SEARCH_API_URL;
-        const originalApiKey = process.env.SEARCH_API_KEY;
-        const originalUserAgent = process.env.SEARCH_USER_AGENT;
-        const originalTimeout = process.env.TIMEOUT;
-
         try {
-          // Temporarily override environment variables with header values
-          if (headerProvider) process.env.SEARCH_PROVIDER = headerProvider;
-          if (headerApiUrl) process.env.SEARCH_API_URL = headerApiUrl;
-          if (headerApiKey) process.env.SEARCH_API_KEY = headerApiKey;
-          if (headerUserAgent) process.env.SEARCH_USER_AGENT = headerUserAgent;
-          if (headerTimeout) process.env.TIMEOUT = headerTimeout;
 
           let transport: WebStandardStreamableHTTPServerTransport;
           let webRequest: Request;
@@ -830,39 +834,11 @@ async function runServer(): Promise<void> {
               id: null,
             }));
           }
-        } finally {
-          // Restore original environment variables after request
-          if (originalProvider !== undefined) {
-            process.env.SEARCH_PROVIDER = originalProvider;
-          } else {
-            delete process.env.SEARCH_PROVIDER;
-          }
-
-          if (originalApiUrl !== undefined) {
-            process.env.SEARCH_API_URL = originalApiUrl;
-          } else {
-            delete process.env.SEARCH_API_URL;
-          }
-
-          if (originalApiKey !== undefined) {
-            process.env.SEARCH_API_KEY = originalApiKey;
-          } else {
-            delete process.env.SEARCH_API_KEY;
-          }
-
-          if (originalUserAgent !== undefined) {
-            process.env.SEARCH_USER_AGENT = originalUserAgent;
-          } else {
-            delete process.env.SEARCH_USER_AGENT;
-          }
-
-          if (originalTimeout !== undefined) {
-            process.env.TIMEOUT = originalTimeout;
-          } else {
-            delete process.env.TIMEOUT;
-          }
         }
       });
+
+      // Create HTTP server from Express app
+      const httpServer = createHttpServer(app);
 
       // Configure server timeouts to prevent session disconnections
       // Keep-alive timeout should be longer than typical idle periods
@@ -874,7 +850,8 @@ async function runServer(): Promise<void> {
 
       httpServer.listen(port, () => {
         process.stderr.write(`OneSearch MCP server (Streamable HTTP) listening on http://0.0.0.0:${port}\n`);
-        process.stderr.write(`Endpoint: http://0.0.0.0:${port}/mcp\n`);
+        process.stderr.write(`MCP Endpoint: http://0.0.0.0:${port}/mcp\n`);
+        process.stderr.write(`REST API: http://0.0.0.0:${port}/api\n`);
       });
 
       // Handle shutdown gracefully
