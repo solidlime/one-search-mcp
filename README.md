@@ -164,6 +164,7 @@ ENGINES=all                     # Specific engines to use
 ```bash
 SEARCH_USER_AGENT=Mozilla/5.0...  # Custom user agent
 HEADLESS=true                   # Headless browser mode (default: true)
+SESSION_TIMEOUT_MINUTES=10      # Session timeout in minutes for HTTP mode (default: 10)
 ```
 
 ## 📋 Prerequisites

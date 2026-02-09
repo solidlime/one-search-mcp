@@ -485,8 +485,11 @@ async function runServer(): Promise<void> {
       const sessionLastActive: { [sessionId: string]: number } = {};
       const keepAliveTimers = new Map<string, NodeJS.Timeout>();
 
-      // Session timeout in milliseconds (5 minutes)
-      const SESSION_TIMEOUT = 5 * 60 * 1000;
+      // Session timeout in milliseconds (default: 10 minutes, configurable via SESSION_TIMEOUT_MINUTES)
+      const SESSION_TIMEOUT_MINUTES = parseInt(process.env.SESSION_TIMEOUT_MINUTES || '10', 10);
+      const SESSION_TIMEOUT = SESSION_TIMEOUT_MINUTES * 60 * 1000;
+      
+      process.stderr.write(`Session timeout: ${SESSION_TIMEOUT_MINUTES} minutes\n`);
 
       // Start SSE keep-alive for a session
       // Sends SSE comment (`: keep-alive\n\n`) every 25 seconds to prevent
@@ -641,9 +644,11 @@ async function runServer(): Promise<void> {
           chunks.push(chunk as Buffer);
         }
         const body = Buffer.concat(chunks).toString();
+        process.stderr.write(`  Raw body (${body.length} bytes): ${body.substring(0, 200)}${body.length > 200 ? '...' : ''}\n`);
         try {
           return JSON.parse(body);
-        } catch {
+        } catch (error) {
+          process.stderr.write(`  JSON parse error: ${error instanceof Error ? error.message : String(error)}\n`);
           return null;
         }
       };
@@ -712,15 +717,30 @@ async function runServer(): Promise<void> {
               const parsedBody = await parseBody(req);
               webRequest = toWebRequest(req, parsedBody);
             }
+          } else if (sessionId && !transports[sessionId]) {
+            // Session ID provided but not found - session may have expired or been cleaned up
+            process.stderr.write(`  ✗ Session not found: ${sessionId}\n`);
+            process.stderr.write(`  Available sessions: ${Object.keys(transports).join(', ') || 'none'}\n`);
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({
+              jsonrpc: '2.0',
+              error: { 
+                code: -32000, 
+                message: `Session not found: ${sessionId}. Session may have expired or been cleaned up.` 
+              },
+              id: null,
+            }));
+            return;
           } else if (!sessionId && req.method === 'POST') {
             // Parse request body to check if it's an initialize request
             const parsedBody = await parseBody(req);
 
             if (!parsedBody) {
+              process.stderr.write(`  ✗ Failed to parse request body\n`);
               res.writeHead(400, { 'Content-Type': 'application/json' });
               res.end(JSON.stringify({
                 jsonrpc: '2.0',
-                error: { code: -32700, message: 'Parse error' },
+                error: { code: -32700, message: 'Parse error: Invalid JSON in request body' },
                 id: null,
               }));
               return;
@@ -776,10 +796,12 @@ async function runServer(): Promise<void> {
               return;
             } else {
               // Not an initialize request and no session ID
+              process.stderr.write(`  ✗ Not an initialize request and no session ID\n`);
+              process.stderr.write(`  Request body: ${JSON.stringify(parsedBody)}\n`);
               res.writeHead(400, { 'Content-Type': 'application/json' });
               res.end(JSON.stringify({
                 jsonrpc: '2.0',
-                error: { code: -32000, message: 'Bad Request: No valid session ID' },
+                error: { code: -32000, message: 'Bad Request: No valid session ID or not an initialize request' },
                 id: null,
               }));
               return;
