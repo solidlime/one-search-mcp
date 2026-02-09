@@ -21,7 +21,7 @@ cp assets/config.example.json assets/config.json
 2. Edit `assets/config.json` with your server URL:
 ```json
 {
-  "server_url": "http://your-server:8000"
+  "mcp_server_url": "http://your-server:8000"
 }
 ```
 

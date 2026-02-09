@@ -22,25 +22,25 @@ def get_server_url():
     script_dir = os.path.dirname(os.path.abspath(__file__))
     skill_dir = os.path.dirname(script_dir)  # scripts/ の親
     config_path = os.path.join(skill_dir, 'assets', 'config.json')
-    
+
     if os.path.exists(config_path):
         try:
             with open(config_path, 'r', encoding='utf-8') as f:
                 config = json.load(f)
-                return config.get('server_url')
+                return config.get('mcp_server_url')
         except Exception as e:
             print(f'⚠ 警告: 設定ファイル読み込みエラー: {e}', file=sys.stderr)
-    
+
     # 2. Fallback to environment variable
     server_url = os.environ.get('ONE_SEARCH_URL')
     if server_url:
         return server_url
-    
+
     # 3. Error
     print('❌ エラー: サーバーURLが設定されていません', file=sys.stderr)
     print('\n設定方法1: 設定ファイル', file=sys.stderr)
     print('  1. assets/config.example.json を assets/config.json にコピー', file=sys.stderr)
-    print('  2. server_url を編集', file=sys.stderr)
+    print('  2. mcp_server_url を編集', file=sys.stderr)
     print('\n設定方法2: 環境変数', file=sys.stderr)
     print('  export ONE_SEARCH_URL=http://localhost:8000', file=sys.stderr)
     return None
