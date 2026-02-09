@@ -9,12 +9,15 @@ Web検索とコンテンツ抽出を行います。
 
 ## インストール
 
-### GitHubから直接インストール（推奨）
+### GitHubから直接インストール（現在の方法）
 ```bash
 # グローバルインストール
 npm install -g yokingma/one-search-mcp
 
-# インストール後、コマンド実行
+# MCPサーバーのアドレスを環境変数で指定
+export ONE_SEARCH_URL=http://nas:8000
+
+# コマンド実行
 one-search-skill health
 ```
 
@@ -27,45 +30,34 @@ npx one-search-skill health
 npm install -g one-search-mcp
 ```
 
-### ローカル開発用
-```bash
-# リポジトリのルートディレクトリで
-npm run build
-npm link
-```
-
-## 設定
-MCPサーバーのアドレスを環境変数で指定：
-
-```bash
-export ONE_SEARCH_URL=http://nas:8000
-```
+> **注意**: npxはnpmレジストリ公開後のみ使用可能です。  
+> 現在はGitHubから`npm install -g yokingma/one-search-mcp`でインストールしてください。
 
 ## 使い方
 
 ### Web検索
 ```bash
-npx one-search-skill search '{"query": "TypeScript tutorial", "limit": 5}'
+one-search-skill search '{"query": "TypeScript tutorial", "limit": 5}'
 ```
 
 ### ページスクレイピング
 ```bash
-npx one-search-skill scrape '{"url": "https://example.com", "formats": ["markdown"]}'
+one-search-skill scrape '{"url": "https://example.com", "formats": ["markdown"]}'
 ```
 
 ### URLマッピング
 ```bash
-npx one-search-skill map '{"url": "https://example.com", "limit": 100}'
+one-search-skill map '{"url": "https://example.com", "limit": 100}'
 ```
 
 ### データ抽出
 ```bash
-npx one-search-skill extract '{"urls": ["https://example.com"], "prompt": "タイトルを抽出"}'
+one-search-skill extract '{"urls": ["https://example.com"], "prompt": "タイトルを抽出"}'
 ```
 
 ### サーバー健全性チェック
 ```bash
-npx one-search-skill health
+one-search-skill health
 ```
 
 ## 主な操作
@@ -73,7 +65,7 @@ npx one-search-skill health
 ### search - Web検索
 
 ```bash
-npx one-search-skill search '{
+one-search-skill search '{
   "query": "TypeScript MCP",
   "limit": 10,
   "language": "auto",
@@ -92,14 +84,14 @@ npx one-search-skill search '{
 
 ```bash
 # 基本的なスクレイピング
-npx one-search-skill scrape '{
+one-search-skill scrape '{
   "url": "https://example.com/article",
   "formats": ["markdown"],
   "onlyMainContent": true
 }'
 
 # アクション実行後にスクレイピング
-npx one-search-skill scrape '{
+one-search-skill scrape '{
   "url": "https://example.com",
   "actions": [
     {"type": "wait", "milliseconds": 2000},
@@ -121,7 +113,7 @@ npx one-search-skill scrape '{
 ### map - URLマッピング
 
 ```bash
-npx one-search-skill map '{
+one-search-skill map '{
   "url": "https://example.com",
   "search": "tutorial",
   "limit": 100
@@ -139,7 +131,7 @@ npx one-search-skill map '{
 ### extract - 構造化データ抽出
 
 ```bash
-npx one-search-skill extract '{
+one-search-skill extract '{
   "urls": [
     "https://example.com/product1",
     "https://example.com/product2"
