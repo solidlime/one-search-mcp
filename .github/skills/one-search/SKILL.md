@@ -9,20 +9,11 @@ description: 複数の検索エンジンを統合した検索スキル。Web検�
 Web検索とコンテンツ抽出を行います。npxコマンドで簡単に操作できます。
 
 ## 設定
-
-MCPサーバーのアドレスを環境変数で指定してください：
-
-```bash
-ONE_SEARCH_URL=http://localhost:8000
-```
-
-Docker等でサーバーを別ホストで動かしている場合：
+MCPサーバーのアドレスを環境変数で指定：
 
 ```bash
-ONE_SEARCH_URL=http://nas:8000
+export ONE_SEARCH_URL=http://nas:8000
 ```
-
-> **注意**: `ONE_SEARCH_URL`環境変数が設定されていない場合、エラーメッセージが表示されます。
 
 ## 使い方
 
@@ -138,40 +129,6 @@ npx one-search-skill extract '{
 - `systemPrompt`: システムプロンプト（オプション）
 - `enableWebSearch`: 追加コンテキストのためWeb検索を有効化（オプション）
 
-## トラブルシューティング
-
-### 環境変数が設定されていません
-
-```
-❌ エラー: 環境変数 ONE_SEARCH_URL が設定されていません
-```
-
-**解決方法:**
-
-```bash
-# Linux/Mac
-export ONE_SEARCH_URL=http://localhost:8000
-npx one-search-skill search '{"query": "AI"}'
-
-# Windows PowerShell
-$env:ONE_SEARCH_URL="http://localhost:8000"
-npx one-search-skill search '{"query": "AI"}'
-
-# または一時的に設定
-ONE_SEARCH_URL=http://localhost:8000 npx one-search-skill search '{"query": "AI"}'
-```
-
-### サーバーへの接続に失敗しました
-
-```
-❌ エラー: サーバーへの接続に失敗しました
-```
-
-**確認事項:**
-1. MCPサーバーが起動していますか？
-2. `ONE_SEARCH_URL` が正しく設定されていますか？
-3. サーバーにアクセスできますか？（例: `http://localhost:8000/health` にブラウザでアクセス）
-
 ## コツ
 
 1. **limit設定**: 必要最小限の件数だけ取得して高速化
@@ -179,26 +136,6 @@ ONE_SEARCH_URL=http://localhost:8000 npx one-search-skill search '{"query": "AI"
 3. **環境変数の永続化**: `.bashrc` や `.zshrc` に `export ONE_SEARCH_URL=...` を追加
 4. **プロバイダー選択**: サーバー側で環境変数 `SEARCH_PROVIDER` で設定
 5. **アクション活用**: 動的コンテンツは `actions` で読み込みを待機
-
-## サーバー起動方法
-
-### 統合サーバー（MCP + REST API）
-
-```bash
-# Docker
-docker run -p 8000:8000 -e SEARCH_PROVIDER=local one-search-mcp
-
-# npm
-npx one-search-mcp streamable-http --port 8000
-```
-
-### API専用サーバー
-
-```bash
-# npm
-npm run build
-npm run start:api
-```
 
 ---
 
