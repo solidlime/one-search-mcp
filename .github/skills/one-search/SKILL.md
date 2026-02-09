@@ -11,6 +11,22 @@ Execute web searches, scrape webpage content, discover URLs from websites, and e
 
 ## Setup
 
+**Method 1: Configuration File (Recommended)**
+
+1. Copy the example config:
+```bash
+cp assets/config.example.json assets/config.json
+```
+
+2. Edit `assets/config.json` with your server URL:
+```json
+{
+  "server_url": "http://your-server:8000"
+}
+```
+
+**Method 2: Environment Variable**
+
 Set the OneSearch server URL:
 
 ```bash
@@ -21,6 +37,8 @@ Windows PowerShell:
 ```powershell
 $env:ONE_SEARCH_URL="http://localhost:8000"
 ```
+
+> **Note**: Configuration file takes priority over environment variable.
 
 ## Quick Start
 

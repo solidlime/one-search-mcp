@@ -16,15 +16,40 @@ import urllib.request
 import urllib.error
 
 
-def main():
-    # Check environment variable
+def get_server_url():
+    """Get server URL from config file or environment variable"""
+    # 1. Try to load from config.json
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    skill_dir = os.path.dirname(script_dir)  # scripts/ の親
+    config_path = os.path.join(skill_dir, 'assets', 'config.json')
+    
+    if os.path.exists(config_path):
+        try:
+            with open(config_path, 'r', encoding='utf-8') as f:
+                config = json.load(f)
+                return config.get('server_url')
+        except Exception as e:
+            print(f'⚠ 警告: 設定ファイル読み込みエラー: {{e}}', file=sys.stderr)
+    
+    # 2. Fallback to environment variable
     server_url = os.environ.get('ONE_SEARCH_URL')
+    if server_url:
+        return server_url
+    
+    # 3. Error
+    print('❌ エラー: サーバーURLが設定されていません', file=sys.stderr)
+    print('\n設定方法1: 設定ファイル', file=sys.stderr)
+    print('  1. assets/config.example.json を assets/config.json にコピー', file=sys.stderr)
+    print('  2. server_url を編集', file=sys.stderr)
+    print('\n設定方法2: 環境変数', file=sys.stderr)
+    print('  export ONE_SEARCH_URL=http://localhost:8000', file=sys.stderr)
+    return None
+
+
+def main():
+    # Get server URL
+    server_url = get_server_url()
     if not server_url:
-        print('❌ エラー: 環境変数 ONE_SEARCH_URL が設定されていません', file=sys.stderr)
-        print('\n設定方法:', file=sys.stderr)
-        print('  export ONE_SEARCH_URL=http://localhost:8000', file=sys.stderr)
-        print('\n使用例:', file=sys.stderr)
-        print('  python map.py \'{"url": "https://example.com"}\'', file=sys.stderr)
         sys.exit(1)
 
     # Parse arguments
