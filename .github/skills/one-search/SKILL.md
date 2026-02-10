@@ -1,86 +1,15 @@
 ---
 name: one-search
-description: Web search, scraping, URL discovery, and data extraction using OneSearch MCP server. Use for web research, content collection, site mapping, and extracting structured data from websites.
+description: Web search, scraping, URL discovery, and data extraction using OneSearch MCP server. Use when user says "search the web", "scrape this page", "get content from", "map this website", "find URLs", "extract data from", or asks for current information, web research, content collection, or structured data extraction. Supports browser automation, dynamic content, AI-powered extraction, and batch processing.
 ---
 
 # OneSearch
 
-## Overview
-
-Execute web searches, scrape webpage content, discover URLs from websites, and extract structured data using the OneSearch MCP server's REST API.
-
-## Setup
-
-**Prerequisites:**
-- Python 3.7 or higher
-- OneSearch MCP server running (see main README.md)
-
-**Method 1: Configuration File (Recommended)**
-
-1. Copy the example config:
-```bash
-cp references/config.example.json references/config.json
-```
-
-2. Edit `references/config.json` with your server URL:
-```json
-{
-  "mcp_server_url": "http://your-server:8000",
-  "skill_root_path": null
-}
-```
-
-> **Note**:
-> - `mcp_server_url`: Required. URL of your OneSearch MCP server
-> - `skill_root_path`: Optional. Absolute path to skill root directory. If `null`, scripts auto-detect their location using `__file__`. Set this when using the skill as a global skill outside the workspace.
-
-**Method 2: Environment Variable**
-
-Set the OneSearch server URL:
-
-```bash
-export ONE_SEARCH_URL=http://localhost:8000
-```
-
-Windows PowerShell:
-```powershell
-$env:ONE_SEARCH_URL="http://localhost:8000"
-```
-
-> **Note**: Configuration file takes priority over environment variable.
-
-**For Global Skills (outside workspace):**
-
-When using this skill as a global skill (not in the current workspace), set the `skill_root_path` in config.json:
-
-```json
-{
-  "mcp_server_url": "http://localhost:8000",
-  "skill_root_path": "/Users/you/.claude/skills/one-search"
-}
-```
-
-Windows example:
-```json
-{
-  "mcp_server_url": "http://localhost:8000",
-  "skill_root_path": "C:\\Users\\You\\.claude\\skills\\one-search"
-}
-```
-
-> **Note**: When `skill_root_path` is `null`, scripts automatically detect their location using `__file__`. This works perfectly for workspace-local skills.
-
-**Windows Encoding Fix:**
-
-All scripts include automatic UTF-8 encoding for Windows environments. If you still encounter encoding issues, ensure your terminal supports UTF-8:
-
-```powershell
-# PowerShell
-[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-chcp 65001
-```
+Execute web searches, scrape content, discover URLs, and extract structured data using the OneSearch MCP server's REST API.
 
 ## Quick Start
+
+**Prerequisites**: OneSearch MCP server running (see [SETUP.md](references/SETUP.md) for installation details)
 
 **Web Search**:
 ```bash
@@ -102,70 +31,66 @@ python scripts/map.py '{"url": "https://example.com", "limit": 100}'
 python scripts/extract.py '{"urls": ["https://example.com"], "prompt": "Extract main topics"}'
 ```
 
-## Web Search
+## Instructions
+
+### Web Search
 
 Execute web searches and retrieve results.
 
-**Script**: `scripts/search.py`
+**When to use:** User asks to search the web, find information, or research a topic
 
-**Parameters**:
+**Script:** `scripts/search.py`
+
+**Parameters:**
 - `query` (required): Search keywords
 - `limit`: Number of results (default: 10)
 - `language`: Language code (`en`, `ja`, `auto`)
 - `categories`: Category filter (`general`, `news`, `images`, `it`, `science`)
 - `timeRange`: Time filter (`all`, `day`, `week`, `month`, `year`)
 
-**Example**:
+**Example:**
 ```bash
-python scripts/search.py '{
-  "query": "TypeScript MCP",
-  "limit": 10,
-  "language": "auto",
-  "categories": "general"
-}'
+python scripts/search.py '{"query": "TypeScript MCP", "limit": 10, "language": "auto"}'
 ```
 
-## Web Scraping
+**Expected output:** JSON array with search results including titles, URLs, and content snippets
+
+### Web Scraping
 
 Scrape webpage content with optional browser automation.
 
-**Script**: `scripts/scrape.py`
+**When to use:** User asks to get content from a page, scrape a website, or extract article text
 
-**Parameters**:
+**Script:** `scripts/scrape.py`
+
+**Parameters:**
 - `url` (required): Target URL
 - `formats`: Output formats (`markdown`, `html`, `rawHtml`, `screenshot`, `links`)
 - `onlyMainContent`: Extract only main content (default: true)
 - `waitFor`: Wait time in milliseconds for dynamic content
 - `actions`: Browser automation actions (click, scroll, wait, etc.)
 
-**Basic Scraping**:
+**Basic scraping:**
 ```bash
-python scripts/scrape.py '{
-  "url": "https://example.com/article",
-  "formats": ["markdown"],
-  "onlyMainContent": true
-}'
+python scripts/scrape.py '{"url": "https://example.com/article", "formats": ["markdown"]}'
 ```
 
-**With Browser Actions**:
+**With browser actions for dynamic content:**
 ```bash
-python scripts/scrape.py '{
-  "url": "https://example.com",
-  "actions": [
-    {"type": "wait", "milliseconds": 2000},
-    {"type": "click", "selector": "#load-more"}
-  ],
-  "formats": ["markdown"]
-}'
+python scripts/scrape.py '{"url": "https://example.com", "actions": [{"type": "wait", "milliseconds": 2000}, {"type": "click", "selector": "#load-more"}], "formats": ["markdown"]}'
 ```
 
-## URL Discovery
+**Expected output:** Page content in requested format(s)
+
+### URL Discovery
 
 Discover and map URLs from a website.
 
-**Script**: `scripts/map.py`
+**When to use:** User asks to find pages on a site, map website structure, or discover URLs
 
-**Parameters**:
+**Script:** `scripts/map.py`
+
+**Parameters:**
 - `url` (required): Starting URL
 - `search`: Filter URLs by keyword
 - `limit`: Maximum URLs to discover (default: 100)
@@ -173,68 +98,122 @@ Discover and map URLs from a website.
 - `sitemapOnly`: Only use sitemap.xml
 - `includeSubdomains`: Include subdomains
 
-**Example**:
+**Example:**
 ```bash
-python scripts/map.py '{
-  "url": "https://example.com",
-  "search": "tutorial",
-  "limit": 100
-}'
+python scripts/map.py '{"url": "https://example.com", "search": "tutorial", "limit": 100}'
 ```
 
-## Data Extraction
+**Expected output:** JSON array of discovered URLs matching criteria
+
+### Data Extraction
 
 Extract structured data from multiple URLs using AI.
 
-**Script**: `scripts/extract.py`
+**When to use:** User asks to extract specific data from pages, analyze multiple URLs, or collect structured information
 
-**Parameters**:
+**Script:** `scripts/extract.py`
+
+**Parameters:**
 - `urls` (required): Array of URLs to extract from
 - `prompt` (required): Extraction instructions
 - `schema`: Optional JSON schema for structured output
 
-**Example**:
+**Example:**
 ```bash
-python scripts/extract.py '{
-  "urls": [
-    "https://example.com/product1",
-    "https://example.com/product2"
-  ],
-  "prompt": "Extract product name, price, and availability"
-}'
+python scripts/extract.py '{"urls": ["https://example.com/product1", "https://example.com/product2"], "prompt": "Extract product name, price, and availability"}'
 ```
 
-### scripts/
-Executable code (Python/Bash/etc.) that can be run directly to perform specific operations.
+**Expected output:** Structured data extracted from all specified URLs
 
-**Examples from other skills:**
-- PDF skill: `fill_fillable_fields.py`, `extract_form_field_info.py` - utilities for PDF manipulation
-- DOCX skill: `document.py`, `utilities.py` - Python modules for document processing
+## Examples
 
-**Appropriate for:** Python scripts, shell scripts, or any executable code that performs automation, data processing, or specific operations.
+### Example 1: Research News
 
-**Note:** Scripts may be executed without loading into context, but can still be read by Codex for patching or environment adjustments.
+User says: "Search for recent AI developments"
 
-### references/
-Documentation and reference material intended to be loaded into context to inform Codex's process and thinking.
+Actions:
+```bash
+python scripts/search.py '{"query": "AI developments", "limit": 10, "timeRange": "week"}'
+```
 
-**Examples from other skills:**
-- Product management: `communication.md`, `context_building.md` - detailed workflow guides
-- BigQuery: API reference documentation and query examples
-- Finance: Schema documentation, company policies
+Result: List of recent articles with titles, URLs, and snippets
 
-**Appropriate for:** In-depth documentation, API references, database schemas, comprehensive guides, or any detailed information that Codex should reference while working.
+### Example 2: Scrape Article Content
 
-### assets/
-Files not intended to be loaded into context, but rather used within the output Codex produces.
+User says: "Get the content from this article"
 
-**Examples from other skills:**
-- Brand styling: PowerPoint template files (.pptx), logo files
-- Frontend builder: HTML/React boilerplate project directories
-- Typography: Font files (.ttf, .woff2)
+Actions:
+```bash
+python scripts/scrape.py '{"url": "https://example.com/article", "formats": ["markdown"]}'
+```
 
-**Appropriate for:** Templates, boilerplate code, document templates, images, icons, fonts, or any files meant to be copied or used in the final output.
+Result: Clean markdown text of article content
 
----
+### Example 3: Map Website Structure
 
-**Not every skill requires all three types of resources.**
+User says: "Find all tutorial pages on this site"
+
+Actions:
+```bash
+python scripts/map.py '{"url": "https://example.com", "search": "tutorial", "limit": 50}'
+```
+
+Result: List of URLs containing "tutorial" keyword
+
+### Example 4: Extract Product Data
+
+User says: "Extract product info from these pages"
+
+Actions:
+```bash
+python scripts/extract.py '{"urls": ["url1", "url2"], "prompt": "Extract name, price, rating"}'
+```
+
+Result: Structured data with product information from all pages
+
+## Troubleshooting
+
+### Error: Connection refused
+
+**Cause:** OneSearch MCP server is not running
+
+**Solution:**
+1. Verify server is running: `curl http://localhost:8000/health`
+2. Check server URL in config.json or ONE_SEARCH_URL environment variable
+3. Start server if needed (see main README.md)
+
+### Error: Module not found
+
+**Cause:** Required Python packages not installed
+
+**Solution:**
+```bash
+pip install requests
+```
+
+### Error: Encoding issues on Windows
+
+**Cause:** Terminal doesn't support UTF-8
+
+**Solution:**
+```powershell
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+chcp 65001
+```
+
+### Error: Empty or incomplete scraping results
+
+**Cause:** Page content is dynamically loaded
+
+**Solution:** Add wait time or browser actions:
+```bash
+python scripts/scrape.py '{"url": "...", "waitFor": 3000, "actions": [{"type": "wait", "milliseconds": 2000}]}'
+```
+
+## Configuration
+
+**See [SETUP.md](references/SETUP.md)** for detailed configuration options including:
+- Configuration file vs environment variables
+- Global skill setup
+- Windows encoding fixes
+- Server URL configuration
