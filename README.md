@@ -85,7 +85,7 @@ Content-Type: application/json
 
 # Scrape
 POST http://localhost:8000/api/tools/scrape
-{"url": "https://example.com"}
+{"url": "https://example.com", "maxLength": 50000}
 
 # Map (discover URLs)
 POST http://localhost:8000/api/tools/map
@@ -282,7 +282,22 @@ X-User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36
 // Using one_scrape tool
 {
   "url": "https://example.com",
-  "formats": ["markdown", "html"]
+  "formats": ["markdown", "html"],
+  "onlyMainContent": true,  // Extract only main content (default: true)
+  "maxLength": 50000        // Max content length in characters (0 = unlimited)
+}
+
+// Quick scrape (lightweight)
+{
+  "url": "https://example.com/article",
+  "maxLength": 10000
+}
+
+// Full content scrape
+{
+  "url": "https://example.com/docs",
+  "onlyMainContent": false,  // Include navigation, footer, etc.
+  "maxLength": 0              // No length limit
 }
 ```
 

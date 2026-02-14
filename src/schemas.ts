@@ -89,6 +89,7 @@ export const ScrapeSchema = z.object({
     'extract',
   ])).optional().describe("Content formats to extract (default: ['markdown'])"),
   onlyMainContent: z.boolean().optional().describe('Extract only the main content, filtering out navigation, footers, etc.'),
+  maxLength: z.number().optional().describe('Maximum content length in characters (0 = unlimited)'),
   includeTags: z.array(z.string()).optional().describe('HTML tags to specifically include in extraction'),
   excludeTags: z.array(z.string()).optional().describe('HTML tags to exclude from extraction'),
   waitFor: z.number().optional().describe('Time in milliseconds to wait for dynamic content to load'),

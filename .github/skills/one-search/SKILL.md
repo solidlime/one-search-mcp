@@ -66,13 +66,24 @@ Scrape webpage content with optional browser automation.
 **Parameters:**
 - `url` (required): Target URL
 - `formats`: Output formats (`markdown`, `html`, `rawHtml`, `screenshot`, `links`)
-- `onlyMainContent`: Extract only main content (default: true)
+- `onlyMainContent`: Extract only main content, filtering out navigation/footer (default: true)
+- `maxLength`: Maximum content length in characters (default: 50000, 0 = unlimited)
 - `waitFor`: Wait time in milliseconds for dynamic content
 - `actions`: Browser automation actions (click, scroll, wait, etc.)
 
 **Basic scraping:**
 ```bash
 python scripts/scrape.py '{"url": "https://example.com/article", "formats": ["markdown"]}'
+```
+
+**Lightweight scraping (10KB limit):**
+```bash
+python scripts/scrape.py '{"url": "https://example.com/news", "maxLength": 10000}'
+```
+
+**Full content scraping (no limits):**
+```bash
+python scripts/scrape.py '{"url": "https://example.com/docs", "onlyMainContent": false, "maxLength": 0}'
 ```
 
 **With browser actions for dynamic content:**
@@ -170,6 +181,41 @@ python scripts/extract.py '{"urls": ["url1", "url2"], "prompt": "Extract name, p
 ```
 
 Result: Structured data with product information from all pages
+
+## Best Practices
+
+### Scraping Optimization
+
+**Content Size Control:**
+- Default `maxLength: 50000` provides balanced performance and information
+- Use `maxLength: 10000` for quick summaries and keyword extraction
+- Use `maxLength: 0` only when full content is essential (increases token usage)
+
+**Main Content Extraction:**
+- `onlyMainContent: true` (default) removes navigation, footers, ads
+- Reduces content by ~47% on average (e.g., 750KB → 397KB)
+- Combined with `maxLength`, can reduce by up to 99% for large pages
+
+**Optimization Examples:**
+```bash
+# Quick scan (lightweight, ~10KB)
+python scripts/scrape.py '{"url": "https://news.com", "maxLength": 10000}'
+
+# Standard (balanced, ~50KB)
+python scripts/scrape.py '{"url": "https://blog.com"}'
+
+# Detailed (comprehensive, ~100KB)
+python scripts/scrape.py '{"url": "https://docs.com", "maxLength": 100000}'
+
+# Archive (full content)
+python scripts/scrape.py '{"url": "https://archive.com", "onlyMainContent": false, "maxLength": 0}'
+```
+
+**Performance Tips:**
+- Start with default settings and adjust based on needs
+- For batch processing, use lower `maxLength` to reduce token costs
+- Combine with specific `formats` to get only needed data
+- Use `actions` for dynamic content but expect longer processing time
 
 ## Troubleshooting
 

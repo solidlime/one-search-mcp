@@ -3,6 +3,8 @@ import type { Page } from 'playwright-core';
 import TurndownService from 'turndown';
 import { gfm } from 'turndown-plugin-gfm';
 import * as cheerio from 'cheerio';
+import { Readability } from '@mozilla/readability';
+import { JSDOM } from 'jsdom';
 import { BrowserFinder } from '../browser/finder.js';
 import { defaultLogger } from '../logger/index.js';
 import { BROWSER_CONFIG } from './config.js';
@@ -154,10 +156,35 @@ export class AgentBrowser {
       const formats = options.formats || ['markdown'];
 
       // Get HTML
-      const html = await this.getHtml();
+      let html = await this.getHtml();
+
+      // Extract main content using readability if onlyMainContent is enabled (default: true)
+      if (options.onlyMainContent !== false) {
+        try {
+          const dom = new JSDOM(html, { url });
+          const reader = new Readability(dom.window.document);
+          const article = reader.parse();
+
+          if (article && article.content) {
+            html = article.content;
+            result.title = article.title;
+          }
+        } catch (error) {
+          // Fallback to full HTML if readability fails
+          defaultLogger.warn('Readability failed, using full HTML', error);
+        }
+      }
 
       if (formats.includes('markdown')) {
-        result.markdown = this.turndown.turndown(html);
+        let markdown = this.turndown.turndown(html);
+
+        // Apply maxLength limit if specified
+        const maxLength = options.maxLength ?? Number(process.env.SCRAPE_MAX_LENGTH ?? 0);
+        if (maxLength > 0 && markdown.length > maxLength) {
+          markdown = markdown.substring(0, maxLength) + '\n\n[Content truncated...]';
+        }
+
+        result.markdown = markdown;
       }
 
       if (formats.includes('html') || formats.includes('rawHtml')) {

@@ -308,6 +308,9 @@ async function processScrape(url: string, args: Omit<ScrapeInput, 'url'>): Promi
   result: any;
   success: boolean;
 }> {
+  // Get maxLength from args or environment variable
+  const maxLength = args.maxLength ?? Number(process.env.SCRAPE_MAX_LENGTH ?? 0);
+
   const browser = new AgentBrowser({
     headless: true,
     timeout: 30000,
@@ -322,24 +325,30 @@ async function processScrape(url: string, args: Omit<ScrapeInput, 'url'>): Promi
 
     const content: string[] = [];
 
+    // Priority: markdown > html > rawHtml (avoid duplication)
     if (res.markdown) {
-      content.push(res.markdown);
-    }
+      let markdown = res.markdown;
 
-    if (res.rawHtml) {
+      // Apply maxLength limit if specified
+      if (maxLength > 0 && markdown.length > maxLength) {
+        markdown = markdown.substring(0, maxLength) + '\n\n[Content truncated...]';
+      }
+
+      content.push(markdown);
+    } else if (res.html) {
+      content.push(res.html);
+    } else if (res.rawHtml) {
       content.push(res.rawHtml);
     }
 
-    if (res.links) {
-      content.push(res.links.join('\n'));
+    // Links as a separate section
+    if (res.links && res.links.length > 0) {
+      content.push(`\n--- Extracted Links ---\n${res.links.join('\n')}`);
     }
 
+    // Screenshot as metadata only (not base64 text)
     if (res.screenshot) {
-      content.push(res.screenshot);
-    }
-
-    if (res.html) {
-      content.push(res.html);
+      content.push(`\n--- Screenshot ---\n[Screenshot captured: ${res.screenshot.length} bytes]`);
     }
 
     return {

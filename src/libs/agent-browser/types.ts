@@ -19,6 +19,7 @@ export interface AgentBrowserOptions {
 
 export interface ScrapeResult {
   success: boolean;
+  title?: string;
   markdown?: string;
   html?: string;
   rawHtml?: string;
@@ -62,6 +63,7 @@ export interface ScrapeOptions {
   mobile?: boolean;
   skipTlsVerification?: boolean;
   removeBase64Images?: boolean;
+  maxLength?: number;
 }
 
 /**

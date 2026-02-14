@@ -118,6 +118,7 @@ export function createApiRouter(): Router {
         const result = await browser.scrapeUrl(args.url, {
           formats: args.formats || ['markdown'],
           onlyMainContent: args.onlyMainContent,
+          maxLength: args.maxLength,
           includeTags: args.includeTags,
           excludeTags: args.excludeTags,
           waitFor: args.waitFor,
