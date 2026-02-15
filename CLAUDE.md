@@ -43,14 +43,41 @@ Runs the compiled server from `dist/index.js`.
 - Registers four main tools: `one_search`, `one_scrape`, `one_map`, `one_extract`
 - Routes tool requests to appropriate handlers based on configured search provider
 
+**Configuration Management** ([src/config.ts](src/config.ts), [src/constants.ts](src/constants.ts))
+
+- **Centralized Configuration**: All environment variable handling in one place
+  - `getSearchConfig()`: Get search provider settings
+  - `getSearchDefaultConfig()`: Get search parameter defaults
+  - `getBrowserConfig()`: Get browser configuration with defaults
+  - `getSessionConfig()`: Get session timeout configuration
+- **Constants Module**: Magic numbers replaced with named constants
+  - `TIMEOUTS`: Browser, API, SSE keep-alive intervals
+  - `SEARCH_DEFAULTS`: Default search parameters
+  - `SERVER`: Server version and configuration
+  - `CONTENT_LIMITS`: Content length constraints
+
+**Browser Helpers** ([src/browser-helpers.ts](src/browser-helpers.ts))
+
+- `createBrowser()`: Create AgentBrowser with consistent configuration
+- `withBrowser()`: Execute browser operations with automatic cleanup (ensures browser is always closed)
+- Eliminates repetitive try-finally blocks throughout codebase
+
 #### Search Provider Architecture
 
-The server supports multiple search providers through a pluggable architecture:
+The server supports multiple search providers through a **Strategy pattern** implementation ([src/search/provider-factory.ts](src/search/provider-factory.ts)):
+
 - **searxng**: Self-hosted meta-search engine ([src/search/searxng.ts](src/search/searxng.ts))
 - **tavily**: Cloud-based search API ([src/search/tavily.ts](src/search/tavily.ts))
 - **bing**: Microsoft Bing Search API ([src/search/bing.ts](src/search/bing.ts))
 - **duckduckgo**: DuckDuckGo search ([src/search/duckduckgo.ts](src/search/duckduckgo.ts))
 - **local**: Browser-based search using agent-browser ([src/search/local.ts](src/search/local.ts))
+- **google**, **zhipu**, **exa**, **bocha**: Additional provider integrations
+
+**Provider Factory Pattern:**
+- `executeSearch()`: Main entry point that delegates to appropriate provider strategy
+- `SearchProviderRegistry`: Singleton that caches provider strategies
+- Type-safe safe search conversion with boundary checking
+- Eliminates large switch statements (previously 90+ lines, now ~8 lines)
 
 The active provider is determined by the `SEARCH_PROVIDER` environment variable (defaults to `local`).
 
@@ -94,24 +121,46 @@ Environment variables control behavior:
 ### Search Flow
 
 1. Request arrives via MCP protocol
-2. `processSearch()` routes to appropriate provider based on `SEARCH_PROVIDER`
-3. Provider-specific search function executes
-4. For `local` provider: AgentBrowser launches Playwright, scrapes search results, extracts content
-5. Results formatted as text with title, URL, description, and optional markdown content
+2. `processSearch()` calls `executeSearch()` from provider factory
+3. Provider factory selects appropriate strategy based on `SEARCH_PROVIDER`
+4. Strategy executes search with merged default configuration
+5. For `local` provider: `withBrowser()` ensures safe browser lifecycle management
+6. Results formatted as text with title, URL, description, and optional markdown content
+
+**Code Example (simplified):**
+```typescript
+async function processSearch(args: ISearchRequestOptions): Promise<ISearchResponse> {
+  const config = getSearchConfig();
+  return await executeSearch(config.provider, args, {
+    apiKey: config.apiKey,
+    apiUrl: config.apiUrl,
+  });
+}
+```
 
 ### Browser Management
 
 - Local browser operations use `agent-browser` with `playwright-core` (no bundled Chromium)
 - Browser must be installed separately via `agent-browser install` or `npx playwright install chromium`
-- Browser lifecycle managed per request (launch → operation → close)
-- AgentBrowser class provides unified interface for navigation, scraping, and extraction
+- Browser lifecycle managed via `withBrowser()` helper for guaranteed cleanup
+- `createBrowser()` provides consistent configuration from environment variables
+- All browser operations (search, scrape, map, extract) use the same helper pattern
+
+**Code Example:**
+```typescript
+return await withBrowser(async (browser) => {
+  const res = await browser.scrapeUrl(url, options);
+  return processResult(res);
+}); // Browser automatically closed here
+```
 
 ### Scraping and Extraction
 
 - `processScrape()`: Scrapes a single URL with configurable formats (markdown, HTML, links, screenshots)
 - `processMapUrl()`: Discovers URLs from a starting page with filtering options
 - `processExtract()`: Extracts content from multiple URLs with optional LLM prompts and schemas
-- All operations use the AgentBrowser wrapper for consistent behavior
+- All operations use `withBrowser()` for consistent behavior and automatic cleanup
+- Content length limits configurable via `getScrapeMaxLength()` with proper constant references
 
 ### Error Handling
 - All tool handlers wrapped in try-catch with logging
@@ -125,6 +174,36 @@ Environment variables control behavior:
 - The project uses ESM modules exclusively - all imports must include `.js` extensions
 - MCP SDK v1.25+ uses the new `registerTool` API pattern instead of `setRequestHandler`
 - Zod schemas provide runtime validation and type inference for all tool inputs
+
+## Code Organization Best Practices
+
+The codebase follows clean code principles with centralized configuration and helper functions:
+
+- **No Magic Numbers**: All constants defined in `constants.ts` (timeouts, defaults, limits)
+- **DRY Principle**: Shared logic extracted to helpers (`withBrowser()`, `createBrowser()`)
+- **Strategy Pattern**: Search providers use factory pattern instead of large switch statements
+- **Type Safety**: Safe search type conversion with boundary checking
+- **Automatic Cleanup**: `withBrowser()` ensures resources are always freed
+- **Single Source of Truth**: All environment variable handling in `config.ts`
+
+**Before refactoring:**
+```typescript
+// 90+ line switch statement
+switch (config.provider) {
+  case 'searxng': { /* 10 lines */ }
+  case 'tavily': { /* 10 lines */ }
+  // ... 7 more cases
+}
+```
+
+**After refactoring:**
+```typescript
+// 8 lines with strategy pattern
+async function processSearch(args) {
+  const config = getSearchConfig();
+  return await executeSearch(config.provider, args, config);
+}
+```
 
 ## Migration from Firecrawl
 

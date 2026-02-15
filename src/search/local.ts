@@ -1,5 +1,6 @@
 import { ISearchRequestOptions, ISearchResponse, ISearchResponseResult } from '../interface.js';
-import { AgentBrowser, type SearchEngine, VALID_SEARCH_ENGINES } from '../libs/agent-browser/index.js';
+import { type SearchEngine, VALID_SEARCH_ENGINES } from '../libs/agent-browser/index.js';
+import { withBrowser } from '../browser-helpers.js';
 import { PinoLogger } from '../libs/logger/index.js';
 
 const logger = new PinoLogger('[LocalSearch]');
@@ -50,12 +51,7 @@ export async function localSearch(options: ISearchRequestOptions): Promise<ISear
     throw new Error(`No valid search engines provided. Valid engines: ${VALID_SEARCH_ENGINES.join(', ')}`);
   }
 
-  const browser = new AgentBrowser({
-    headless: true,
-    timeout: 30000,
-  });
-
-  try {
+  return await withBrowser(async (browser) => {
     const results: ISearchResponseResult[] = [];
 
     for (const engine of validEngines) {
@@ -86,11 +82,5 @@ export async function localSearch(options: ISearchRequestOptions): Promise<ISear
       results,
       success: true,
     };
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : 'Local search error.';
-    logger.error(msg, err);
-    throw err;
-  } finally {
-    await browser.close();
-  }
+  });
 }

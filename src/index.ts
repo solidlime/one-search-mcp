@@ -7,53 +7,19 @@ import { createServer as createHttpServer } from 'node:http';
 import { randomUUID } from 'node:crypto';
 import express from 'express';
 import cors from 'cors';
-import { ISearchRequestOptions, ISearchResponse, SearchProvider } from './interface.js';
-import { bingSearch, duckDuckGoSearch, searxngSearch, tavilySearch, localSearch, googleSearch, zhipuSearch, exaSearch, bochaSearch } from './search/index.js';
+import { ISearchRequestOptions, ISearchResponse } from './interface.js';
 import { SEARCH_TOOL, EXTRACT_TOOL, SCRAPE_TOOL, MAP_TOOL } from './tools.js';
 import type { SearchInput, MapInput, ScrapeInput, ExtractInput } from './schemas.js';
-import { AgentBrowser } from './libs/agent-browser/index.js';
 import { InMemoryEventStore } from './eventStore.js';
 import { createApiRouter } from './api-routes.js';
+import { executeSearch } from './search/provider-factory.js';
+import { withBrowser } from './browser-helpers.js';
+import { getSearchConfig, getScrapeMaxLength, getSessionConfig } from './config.js';
+import { TIMEOUTS, SERVER, CONTENT_LIMITS } from './constants.js';
 import dotenvx from '@dotenvx/dotenvx';
-import { SafeSearchType } from 'duck-duck-scrape';
 
 // Load environment variables silently (suppress all output)
 dotenvx.config({ quiet: true });
-
-// Helper function to get current search configuration
-// This allows dynamic configuration from HTTP headers in streamable-http mode
-function getSearchConfig() {
-  return {
-    provider: (process.env.SEARCH_PROVIDER as SearchProvider) ?? 'local',
-    apiUrl: process.env.SEARCH_API_URL,
-    apiKey: process.env.SEARCH_API_KEY,
-  };
-}
-
-// search query params
-const SAFE_SEARCH = process.env.SAFE_SEARCH ?? 0;
-const LIMIT = process.env.LIMIT ?? 10;
-const CATEGORIES = process.env.CATEGORIES ?? 'general';
-const ENGINES = process.env.ENGINES ?? 'all';
-const FORMAT = process.env.FORMAT ?? 'json';
-const LANGUAGE = process.env.LANGUAGE ?? 'auto';
-const TIME_RANGE = process.env.TIME_RANGE ?? '';
-const USER_AGENT = process.env.SEARCH_USER_AGENT ?? 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
-
-// Helper function to get search configuration with dynamic values
-function getSearchDefaultConfig() {
-  return {
-    limit: Number(process.env.LIMIT ?? LIMIT),
-    categories: process.env.CATEGORIES ?? CATEGORIES,
-    format: process.env.FORMAT ?? FORMAT,
-    safesearch: process.env.SAFE_SEARCH ?? SAFE_SEARCH,
-    language: process.env.LANGUAGE ?? LANGUAGE,
-    engines: process.env.ENGINES ?? ENGINES,
-    time_range: process.env.TIME_RANGE ?? TIME_RANGE,
-    timeout: process.env.TIMEOUT ? Number(process.env.TIMEOUT) : 10000,
-    userAgent: process.env.SEARCH_USER_AGENT ?? USER_AGENT,
-  };
-}
 
 // Factory function to create a new MCP server instance
 // This is called for each session in streamable-http mode
@@ -93,124 +59,124 @@ function createMcpServer(): McpServer {
         });
 
         return result;
-    } catch (error) {
+      } catch (error) {
+        await server.sendLoggingMessage({
+          level: 'error',
+          data: `[${new Date().toISOString()}] Error in ${toolName}: ${error}`,
+        });
+        const msg = error instanceof Error ? error.message : String(error);
+        return {
+          content: [
+            {
+              type: 'text' as const,
+              text: msg,
+            },
+          ],
+          isError: true,
+        };
+      }
+    };
+  }
+
+  // Register tools using the new registerTool API
+  server.registerTool(
+    SEARCH_TOOL.name,
+    {
+      description: SEARCH_TOOL.description,
+      inputSchema: SEARCH_TOOL.schema,
+    },
+    createToolHandler(SEARCH_TOOL.name, async (args: SearchInput) => {
+      const config = getSearchConfig();
+
+      // Send progress notification: search started
       await server.sendLoggingMessage({
-        level: 'error',
-        data: `[${new Date().toISOString()}] Error in ${toolName}: ${error}`,
+        level: 'info',
+        data: `[${new Date().toISOString()}] Search started: query="${args.query}", provider=${config.provider}`,
       });
-      const msg = error instanceof Error ? error.message : String(error);
+
+      const { results, success } = await processSearch({
+        ...args,
+        apiKey: config.apiKey ?? '',
+        apiUrl: config.apiUrl,
+      });
+
+      if (!success) {
+        await server.sendLoggingMessage({
+          level: 'error',
+          data: `[${new Date().toISOString()}] Search failed`,
+        });
+        throw new Error('Failed to search');
+      }
+
+      // Send progress notification: search completed
+      await server.sendLoggingMessage({
+        level: 'info',
+        data: `[${new Date().toISOString()}] Search completed: ${results.length} results found`,
+      });
+
+      const resultsText = results.map((result) => (
+        `Title: ${result.title}
+URL: ${result.url}
+Description: ${result.snippet}
+${result.markdown ? `Content: ${result.markdown}` : ''}`
+      ));
+
       return {
         content: [
           {
             type: 'text' as const,
-            text: msg,
+            text: resultsText.join('\n\n'),
           },
         ],
-        isError: true,
       };
-    }
-  };
-}
+    }),
+  );
 
-// Register tools using the new registerTool API
-server.registerTool(
-  SEARCH_TOOL.name,
-  {
-    description: SEARCH_TOOL.description,
-    inputSchema: SEARCH_TOOL.schema,
-  },
-  createToolHandler(SEARCH_TOOL.name, async (args: SearchInput) => {
-    const config = getSearchConfig();
+  server.registerTool(
+    SCRAPE_TOOL.name,
+    {
+      description: SCRAPE_TOOL.description,
+      inputSchema: SCRAPE_TOOL.schema,
+    },
+    createToolHandler(SCRAPE_TOOL.name, async (args: ScrapeInput) => {
+      const { url, ...scrapeArgs } = args;
+      const { content } = await processScrape(url, scrapeArgs);
 
-    // Send progress notification: search started
-    await server.sendLoggingMessage({
-      level: 'info',
-      data: `[${new Date().toISOString()}] Search started: query="${args.query}", provider=${config.provider}`,
-    });
+      return {
+        content,
+      };
+    }),
+  );
 
-    const { results, success } = await processSearch({
-      ...args,
-      apiKey: config.apiKey ?? '',
-      apiUrl: config.apiUrl,
-    });
+  server.registerTool(
+    MAP_TOOL.name,
+    {
+      description: MAP_TOOL.description,
+      inputSchema: MAP_TOOL.schema,
+    },
+    createToolHandler(MAP_TOOL.name, async (args: MapInput) => {
+      const { content } = await processMapUrl(args.url, args);
 
-    if (!success) {
-      await server.sendLoggingMessage({
-        level: 'error',
-        data: `[${new Date().toISOString()}] Search failed`,
-      });
-      throw new Error('Failed to search');
-    }
+      return {
+        content,
+      };
+    }),
+  );
 
-    // Send progress notification: search completed
-    await server.sendLoggingMessage({
-      level: 'info',
-      data: `[${new Date().toISOString()}] Search completed: ${results.length} results found`,
-    });
+  server.registerTool(
+    EXTRACT_TOOL.name,
+    {
+      description: EXTRACT_TOOL.description,
+      inputSchema: EXTRACT_TOOL.schema,
+    },
+    createToolHandler(EXTRACT_TOOL.name, async (args: ExtractInput) => {
+      const { content } = await processExtract(args);
 
-    const resultsText = results.map((result) => (
-      `Title: ${result.title}
-URL: ${result.url}
-Description: ${result.snippet}
-${result.markdown ? `Content: ${result.markdown}` : ''}`
-    ));
-
-    return {
-      content: [
-        {
-          type: 'text' as const,
-          text: resultsText.join('\n\n'),
-        },
-      ],
-    };
-  }),
-);
-
-server.registerTool(
-  SCRAPE_TOOL.name,
-  {
-    description: SCRAPE_TOOL.description,
-    inputSchema: SCRAPE_TOOL.schema,
-  },
-  createToolHandler(SCRAPE_TOOL.name, async (args: ScrapeInput) => {
-    const { url, ...scrapeArgs } = args;
-    const { content } = await processScrape(url, scrapeArgs);
-
-    return {
-      content,
-    };
-  }),
-);
-
-server.registerTool(
-  MAP_TOOL.name,
-  {
-    description: MAP_TOOL.description,
-    inputSchema: MAP_TOOL.schema,
-  },
-  createToolHandler(MAP_TOOL.name, async (args: MapInput) => {
-    const { content } = await processMapUrl(args.url, args);
-
-    return {
-      content,
-    };
-  }),
-);
-
-server.registerTool(
-  EXTRACT_TOOL.name,
-  {
-    description: EXTRACT_TOOL.description,
-    inputSchema: EXTRACT_TOOL.schema,
-  },
-  createToolHandler(EXTRACT_TOOL.name, async (args: ExtractInput) => {
-    const { content } = await processExtract(args);
-
-    return {
-      content,
-    };
-  }),
-);
+      return {
+        content,
+      };
+    }),
+  );
 
   return server;
 }
@@ -218,89 +184,10 @@ server.registerTool(
 // Business logic functions
 async function processSearch(args: ISearchRequestOptions): Promise<ISearchResponse> {
   const config = getSearchConfig();
-  switch (config.provider) {
-    case 'searxng': {
-      // merge default config with args
-      const defaultConfig = getSearchDefaultConfig();
-      const params = {
-        ...defaultConfig,
-        ...args,
-        apiKey: config.apiKey,
-      };
-
-      // but categories and language have higher priority (ENV > args).
-      const { categories, language } = defaultConfig;
-
-      if (categories) {
-        params.categories = categories;
-      }
-      if (language) {
-        params.language = language;
-      }
-      return await searxngSearch(params);
-    }
-    case 'tavily': {
-      return await tavilySearch({
-        ...getSearchDefaultConfig(),
-        ...args,
-        apiKey: config.apiKey,
-      });
-    }
-    case 'bing': {
-      return await bingSearch({
-        ...getSearchDefaultConfig(),
-        ...args,
-        apiKey: config.apiKey,
-      });
-    }
-    case 'duckduckgo': {
-      const safeSearch = args.safeSearch ?? 0;
-      const safeSearchOptions = [SafeSearchType.STRICT, SafeSearchType.MODERATE, SafeSearchType.OFF];
-      return await duckDuckGoSearch({
-        ...getSearchDefaultConfig(),
-        ...args,
-        apiKey: config.apiKey,
-        safeSearch: safeSearchOptions[safeSearch],
-      });
-    }
-    case 'local': {
-      return await localSearch({
-        ...getSearchDefaultConfig(),
-        ...args,
-      });
-    }
-    case 'google': {
-      return await googleSearch({
-        ...getSearchDefaultConfig(),
-        ...args,
-        apiKey: config.apiKey,
-        apiUrl: config.apiUrl,
-      });
-    }
-    case 'zhipu': {
-      return await zhipuSearch({
-        ...getSearchDefaultConfig(),
-        ...args,
-        apiKey: config.apiKey,
-      });
-    }
-    case 'exa': {
-      return await exaSearch({
-        ...getSearchDefaultConfig(),
-        ...args,
-        apiKey: config.apiKey,
-      });
-    }
-    case 'bocha': {
-      return await bochaSearch({
-        ...getSearchDefaultConfig(),
-        ...args,
-        apiKey: config.apiKey,
-      });
-    }
-    default:
-      throw new Error(`Unsupported search provider: ${config.provider}`);
-  }
+  return await executeSearch(config.provider, args, {
+    apiKey: config.apiKey,
+    apiUrl: config.apiUrl,
+  });
 }
 
 async function processScrape(url: string, args: Omit<ScrapeInput, 'url'>): Promise<{
@@ -309,14 +196,9 @@ async function processScrape(url: string, args: Omit<ScrapeInput, 'url'>): Promi
   success: boolean;
 }> {
   // Get maxLength from args or environment variable
-  const maxLength = args.maxLength ?? Number(process.env.SCRAPE_MAX_LENGTH ?? 0);
+  const maxLength = getScrapeMaxLength(args.maxLength);
 
-  const browser = new AgentBrowser({
-    headless: true,
-    timeout: 30000,
-  });
-
-  try {
+  return await withBrowser(async (browser) => {
     const res = await browser.scrapeUrl(url, args);
 
     if (!res.success) {
@@ -330,7 +212,7 @@ async function processScrape(url: string, args: Omit<ScrapeInput, 'url'>): Promi
       let markdown = res.markdown;
 
       // Apply maxLength limit if specified
-      if (maxLength > 0 && markdown.length > maxLength) {
+      if (maxLength > CONTENT_LIMITS.UNLIMITED && markdown.length > maxLength) {
         markdown = markdown.substring(0, maxLength) + '\n\n[Content truncated...]';
       }
 
@@ -361,9 +243,7 @@ async function processScrape(url: string, args: Omit<ScrapeInput, 'url'>): Promi
       result: res,
       success: true,
     };
-  } finally {
-    await browser.close();
-  }
+  });
 }
 
 async function processMapUrl(url: string, args: Omit<MapInput, 'url'>): Promise<{
@@ -371,12 +251,7 @@ async function processMapUrl(url: string, args: Omit<MapInput, 'url'>): Promise<
   result: string[];
   success: boolean;
 }> {
-  const browser = new AgentBrowser({
-    headless: true,
-    timeout: 30000,
-  });
-
-  try {
+  return await withBrowser(async (browser) => {
     const res = await browser.mapUrl(url, args);
 
     if (!res.success) {
@@ -397,21 +272,15 @@ async function processMapUrl(url: string, args: Omit<MapInput, 'url'>): Promise<
       result: res.links,
       success: true,
     };
-  } finally {
-    await browser.close();
-  }
+  });
 }
 
 async function processExtract(args: ExtractInput): Promise<{
   content: Array<{ type: 'text'; text: string }>;
 }> {
   const { urls, prompt, systemPrompt, schema } = args;
-  const browser = new AgentBrowser({
-    headless: true,
-    timeout: 30000,
-  });
 
-  try {
+  return await withBrowser(async (browser) => {
     const results: string[] = [];
 
     // Extract content from each URL
@@ -462,9 +331,7 @@ async function processExtract(args: ExtractInput): Promise<{
         },
       ],
     };
-  } finally {
-    await browser.close();
-  }
+  });
 }
 
 // Parse command line arguments
@@ -472,7 +339,7 @@ function parseArgs() {
   const args = process.argv.slice(2);
   const mode = args[0];
   const portArg = args.find(arg => arg.startsWith('--port='));
-  const port = portArg ? parseInt(portArg.split('=')[1], 10) : 8000;
+  const port = portArg ? parseInt(portArg.split('=')[1], 10) : SERVER.DEFAULT_API_PORT;
 
   return { mode, port };
 }
@@ -494,11 +361,10 @@ async function runServer(): Promise<void> {
       const sessionLastActive: { [sessionId: string]: number } = {};
       const keepAliveTimers = new Map<string, NodeJS.Timeout>();
 
-      // Session timeout in milliseconds (default: 10 minutes, configurable via SESSION_TIMEOUT_MINUTES)
-      const SESSION_TIMEOUT_MINUTES = parseInt(process.env.SESSION_TIMEOUT_MINUTES || '10', 10);
-      const SESSION_TIMEOUT = SESSION_TIMEOUT_MINUTES * 60 * 1000;
+      // Session timeout configuration
+      const sessionConfig = getSessionConfig();
 
-      process.stderr.write(`Session timeout: ${SESSION_TIMEOUT_MINUTES} minutes\n`);
+      process.stderr.write(`Session timeout: ${sessionConfig.timeoutMinutes} minutes\n`);
 
       // Start SSE keep-alive for a session
       // Sends SSE comment (`: keep-alive\n\n`) every 25 seconds to prevent
@@ -529,10 +395,10 @@ async function runServer(): Promise<void> {
           } catch (error) {
             process.stderr.write(`[${new Date().toISOString()}] Keep-alive error for session ${sessionId}: ${error}\n`);
           }
-        }, 25000); // 25 seconds (well under typical 60s proxy timeout)
+        }, TIMEOUTS.SSE_KEEP_ALIVE_INTERVAL);
 
         keepAliveTimers.set(sessionId, timer);
-        process.stderr.write(`[${new Date().toISOString()}] Keep-alive timer started for session: ${sessionId} (interval: 25s)\n`);
+        process.stderr.write(`[${new Date().toISOString()}] Keep-alive timer started for session: ${sessionId} (interval: ${TIMEOUTS.SSE_KEEP_ALIVE_INTERVAL}ms)\n`);
       };
 
       // Helper to clean up a specific session
@@ -587,7 +453,7 @@ async function runServer(): Promise<void> {
         const inactiveSessions: string[] = [];
 
         for (const [sessionId, lastActive] of Object.entries(sessionLastActive)) {
-          if (now - lastActive > SESSION_TIMEOUT) {
+          if (now - lastActive > sessionConfig.timeoutMs) {
             inactiveSessions.push(sessionId);
           }
         }
@@ -633,6 +499,7 @@ async function runServer(): Promise<void> {
         if (webRes.body) {
           const reader = webRes.body.getReader();
           try {
+            // eslint-disable-next-line no-constant-condition
             while (true) {
               const { done, value } = await reader.read();
               if (done) break;
@@ -720,7 +587,7 @@ async function runServer(): Promise<void> {
           let webRequest: Request;
 
           if (sessionId && transports[sessionId]) {
-            process.stderr.write(`  → Reusing existing session\n`);
+            process.stderr.write('  → Reusing existing session\n');
             // Update last active timestamp
             sessionLastActive[sessionId] = Date.now();
             // Reuse existing transport for established sessions
@@ -743,7 +610,7 @@ async function runServer(): Promise<void> {
               jsonrpc: '2.0',
               error: {
                 code: -32000,
-                message: `Session not found: ${sessionId}. Session may have expired or been cleaned up.`
+                message: `Session not found: ${sessionId}. Session may have expired or been cleaned up.`,
               },
               id: null,
             }));
@@ -753,7 +620,7 @@ async function runServer(): Promise<void> {
             const parsedBody = await parseBody(req);
 
             if (!parsedBody) {
-              process.stderr.write(`  ✗ Failed to parse request body\n`);
+              process.stderr.write('  ✗ Failed to parse request body\n');
               res.writeHead(400, { 'Content-Type': 'application/json' });
               res.end(JSON.stringify({
                 jsonrpc: '2.0',
@@ -764,7 +631,7 @@ async function runServer(): Promise<void> {
             }
 
             if (isInitializeRequest(parsedBody)) {
-              process.stderr.write(`  → Initialize request detected\n`);
+              process.stderr.write('  → Initialize request detected\n');
               // Create new transport and server for initialization requests
               const mcpServer = createMcpServer();
 
@@ -809,11 +676,11 @@ async function runServer(): Promise<void> {
 
               // Send response AFTER registration
               await sendWebResponse(webResponse, res);
-              process.stderr.write(`  ✓ Initialize response sent\n`);
+              process.stderr.write('  ✓ Initialize response sent\n');
               return;
             } else {
               // Not an initialize request and no session ID
-              process.stderr.write(`  ✗ Not an initialize request and no session ID\n`);
+              process.stderr.write('  ✗ Not an initialize request and no session ID\n');
               process.stderr.write(`  Request body: ${JSON.stringify(parsedBody)}\n`);
               res.writeHead(400, { 'Content-Type': 'application/json' });
               res.end(JSON.stringify({
@@ -826,8 +693,8 @@ async function runServer(): Promise<void> {
           } else if (req.method === 'GET') {
             // GET request without session ID - MCP client checking for SSE support
             // Return 405 Method Not Allowed as per MCP spec (we don't support SSE streams)
-            process.stderr.write(`  → GET request without session ID (SSE check)\n`);
-            process.stderr.write(`  ← Returning 405 Method Not Allowed (no SSE support)\n`);
+            process.stderr.write('  → GET request without session ID (SSE check)\n');
+            process.stderr.write('  ← Returning 405 Method Not Allowed (no SSE support)\n');
             res.writeHead(405, {
               'Content-Type': 'application/json',
               'Allow': 'POST',
@@ -853,11 +720,11 @@ async function runServer(): Promise<void> {
             return;
           }
 
-          process.stderr.write(`  → Handling request via transport\n`);
+          process.stderr.write('  → Handling request via transport\n');
           const webResponse = await transport.handleRequest(webRequest);
           process.stderr.write(`  ← Response status: ${webResponse.status}\n`);
           await sendWebResponse(webResponse, res);
-          process.stderr.write(`  ✓ Response sent\n`);
+          process.stderr.write('  ✓ Response sent\n');
         } catch (error) {
           process.stderr.write(`  ✗ ERROR: ${error instanceof Error ? error.message : String(error)}\n`);
           if (error instanceof Error && error.stack) {

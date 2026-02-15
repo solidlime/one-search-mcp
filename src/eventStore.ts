@@ -34,7 +34,7 @@ export class InMemoryEventStore {
    */
   async replayEventsAfter(
     lastEventId: string,
-    callbacks: { send: (eventId: string, message: unknown) => Promise<void> }
+    callbacks: { send: (eventId: string, message: unknown) => Promise<void> },
   ): Promise<string> {
     if (!lastEventId || !this.events.has(lastEventId)) {
       return '';
