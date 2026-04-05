@@ -1,11 +1,14 @@
 import pino from 'pino';
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type LogArgs = [obj: Record<string, unknown>, message: string, ...args: any[]] | [message: string, ...args: any[]];
+
 export interface Logger {
-  info(message: string, ...args: any[]): void;
-  error(message: string, ...args: any[]): void;
-  success(message: string, ...args: any[]): void;
-  warn(message: string, ...args: any[]): void;
-  log(message: string, ...args: any[]): void;
+  info(...args: LogArgs): void;
+  error(...args: LogArgs): void;
+  success(...args: LogArgs): void;
+  warn(...args: LogArgs): void;
+  log(...args: LogArgs): void;
 }
 
 export class PinoLogger implements Logger {
@@ -30,36 +33,50 @@ export class PinoLogger implements Logger {
     );
   }
 
-  private logWithLevel(level: 'info' | 'error' | 'warn', message: string, ...args: any[]): void {
-    if (args.length > 0) {
-      this.logger[level]({ data: args }, message);
+  private logWithLevel(level: 'info' | 'error' | 'warn', ...args: LogArgs): void {
+    if (typeof args[0] === 'object') {
+      // pino structured logging: (obj, message)
+      const [obj, message, ...rest] = args as [Record<string, unknown>, string, ...unknown[]];
+      this.logger[level](obj, message, ...rest);
     } else {
-      this.logger[level](message);
+      // plain string logging: (message, ...extra)
+      const [message, ...rest] = args as [string, ...unknown[]];
+      if (rest.length > 0) {
+        this.logger[level]({ data: rest }, message);
+      } else {
+        this.logger[level](message);
+      }
     }
   }
 
-  info(message: string, ...args: any[]): void {
-    this.logWithLevel('info', message, ...args);
+  info(...args: LogArgs): void {
+    this.logWithLevel('info', ...args);
   }
 
-  error(message: string, ...args: any[]): void {
-    this.logWithLevel('error', message, ...args);
+  error(...args: LogArgs): void {
+    this.logWithLevel('error', ...args);
   }
 
-  success(message: string, ...args: any[]): void {
-    if (args.length > 0) {
-      this.logger.info({ level: 'success', data: args }, message);
+  success(...args: LogArgs): void {
+    if (typeof args[0] === 'object') {
+      const [obj, message, ...rest] = args as [Record<string, unknown>, string, ...unknown[]];
+      this.logger.info({ level: 'success', ...obj }, message, ...rest);
     } else {
-      this.logger.info({ level: 'success' }, message);
+      const [message, ...rest] = args as [string, ...unknown[]];
+      if (rest.length > 0) {
+        this.logger.info({ level: 'success', data: rest }, message);
+      } else {
+        this.logger.info({ level: 'success' }, message);
+      }
     }
   }
 
-  warn(message: string, ...args: any[]): void {
-    this.logWithLevel('warn', message, ...args);
+  warn(...args: LogArgs): void {
+    this.logWithLevel('warn', ...args);
   }
 
-  log(message: string, ...args: any[]): void {
-    this.logWithLevel('info', message, ...args);
+  log(...args: LogArgs): void {
+    this.logWithLevel('info', ...args);
   }
 }
 

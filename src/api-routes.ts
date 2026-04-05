@@ -39,10 +39,11 @@ export function createApiRouter(): Router {
       });
 
       if (!success || !results) {
-        return res.status(500).json({
+        res.status(500).json({
           error: 'Search failed',
           message: 'No results returned from search provider',
         });
+        return;
       }
 
       res.json({

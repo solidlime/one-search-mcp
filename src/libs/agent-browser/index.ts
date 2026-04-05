@@ -167,7 +167,7 @@ export class AgentBrowser {
 
           if (article && article.content) {
             html = article.content;
-            result.title = article.title;
+            result.title = article.title ?? undefined;
           }
         } catch (error) {
           // Fallback to full HTML if readability fails

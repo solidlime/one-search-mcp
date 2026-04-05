@@ -64,6 +64,15 @@ export interface ScrapeOptions {
   skipTlsVerification?: boolean;
   removeBase64Images?: boolean;
   maxLength?: number;
+  extract?: {
+    schema?: Record<string, unknown>;
+    systemPrompt?: string;
+    prompt?: string;
+  };
+  location?: {
+    country?: string;
+    languages?: string[];
+  };
 }
 
 /**
@@ -71,6 +80,8 @@ export interface ScrapeOptions {
  */
 export interface MapOptions {
   search?: string;
+  ignoreSitemap?: boolean;
+  sitemapOnly?: boolean;
   includeSubdomains?: boolean;
   limit?: number;
 }
